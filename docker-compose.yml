@@ -1,0 +1,53 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: solco_db
+    environment:
+      POSTGRES_DB: supplier_platform
+      POSTGRES_USER: supplier_admin
+      POSTGRES_PASSWORD: supplier_pass
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+      - ./database/migrations:/docker-entrypoint-initdb.d/migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supplier_admin -d supplier_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: mary1457/solco-backend:latest
+    container_name: solco_backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/supplier_platform
+      SPRING_DATASOURCE_USERNAME: supplier_admin
+      SPRING_DATASOURCE_PASSWORD: supplier_pass
+      FILE_UPLOAD_DIR: /app/uploads
+      MAIL_FAIL_FAST: "false"
+      APP_FRONTEND_BASE_URL: http://localhost:${FRONTEND_PORT:-5173}
+    ports:
+      - "${BACKEND_PORT:-8081}:8081"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: mary1457/solco-frontend:latest
+    container_name: solco_frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads_data:
