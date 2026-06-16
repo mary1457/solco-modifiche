@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Info, Save } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
@@ -40,11 +40,11 @@ const ANNI_DOC = [
 ];
 
 const ANNI_PROF = [
-  { value: "meno2",   label: "meno di 2 anni" },
-  { value: "2_5",     label: "2–5 anni" },
-  { value: "5_10",    label: "5–10 anni" },
-  { value: "10_20",   label: "10–20 anni" },
-  { value: "oltre20", label: "oltre 20 anni" },
+  { value: "meno1",   label: "Meno di 1 anno" },
+  { value: "1_5",     label: "1–5 anni" },
+  { value: "6_10",    label: "6–10 anni" },
+  { value: "11_15",   label: "11–15 anni" },
+  { value: "oltre16", label: "Oltre 16 anni" },
 ];
 
 /* ─── 3A: aree tematiche ─────────────────────────── */
@@ -314,6 +314,7 @@ export function RevampStep3CompetenzePage() {
   const [errors,  setErrors]  = useState<Record<string, string>>({});
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [sectionWasCompleted, setSectionWasCompleted] = useState(false);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -364,6 +365,12 @@ export function RevampStep3CompetenzePage() {
       return getRevampApplicationSections(app.id, auth!.token!).then(applyS3);
     }).catch(() => {});
   }, [auth?.token, registryType]);
+
+  useEffect(() => {
+    if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
+    const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [titoloStudio, ambitoStudio, annoConseg, certAbitazioni, aree, docenzaPA, consulenza, areaTerritoriale, lingue, lingueDocenza, strumenti, reti, ordine, titoloB, ambitoB, anniEsp, servizi, altroServ, certB]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearErr(key: string) {
     setErrors(p => { const n = { ...p }; delete n[key]; return n; });

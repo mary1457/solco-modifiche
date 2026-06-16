@@ -169,6 +169,16 @@ export function RevampStep5DichiarazioniPage() {
     setChecks(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
+  function selectAllRequired() {
+    setChecks(prev => {
+      const next = { ...prev };
+      for (const d of DECLARATIONS) {
+        if (isRequired(d)) next[d.id] = true;
+      }
+      return next;
+    });
+  }
+
   function isRequired(d: Decl): boolean {
     if (d.required === "docente") return isDocente;
     return d.required;
@@ -268,9 +278,21 @@ export function RevampStep5DichiarazioniPage() {
         <h2 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#1e293b", margin: "0 0 6px" }}>
           Sezione 5 — Dichiarazioni e Consensi
         </h2>
-        <p style={{ fontSize: "0.85rem", color: MUTED, margin: "0 0 24px", lineHeight: 1.5 }}>
-          Leggi attentamente ogni dichiarazione. Le voci obbligatorie (<span style={{ color: ERR }}>*</span>) devono essere accettate per completare l'iscrizione.
-        </p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <p style={{ fontSize: "0.85rem", color: MUTED, margin: 0, lineHeight: 1.5 }}>
+            Leggi attentamente ogni dichiarazione. Le voci obbligatorie (<span style={{ color: ERR }}>*</span>) devono essere accettate per completare l'iscrizione.
+          </p>
+          {!allDone && (
+            <button
+              type="button"
+              onClick={selectAllRequired}
+              style={{ flexShrink: 0, marginLeft: 16, display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: accent, color: "#fff", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              <CheckSquare size={15} />
+              Accetta tutte le obbligatorie
+            </button>
+          )}
+        </div>
 
         {/* Declarations */}
         <div className={fcr.active ? (fcr.isLocked("dichiarazioni") ? "fcr-locked" : "fcr-active-group") : undefined} style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "hidden" }}>

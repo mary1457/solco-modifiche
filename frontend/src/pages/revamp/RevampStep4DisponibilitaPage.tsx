@@ -313,6 +313,7 @@ export function RevampStep4DisponibilitaPage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploadToast, setUploadToast] = useState<string | null>(null);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -355,6 +356,12 @@ export function RevampStep4DisponibilitaPage() {
       return getRevampApplicationSections(app.id, auth!.token!).then(applyS4);
     }).catch(() => {});
   }, [auth?.token, registryType, renewalEdit?.applicationId]);
+
+  useEffect(() => {
+    if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
+    const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [disponibilita, areeSpecifiche, tariffaGiorn, tariffaOra, esperienze, referenze, areaTerrB, tariffaOraB]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearErr(key: string) {
     setErrors(p => { const n = { ...p }; delete n[key]; return n; });

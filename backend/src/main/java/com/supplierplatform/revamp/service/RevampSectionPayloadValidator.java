@@ -330,7 +330,9 @@ public class RevampSectionPayloadValidator {
         String legalCity = payload.path("legalAddress").path("city").asText(null);
         String legalCap = payload.path("legalAddress").path("cap").asText(null);
         String legalProvince = payload.path("legalAddress").path("province").asText(null);
-        if (isBlank(legalStreet) || isBlank(legalCity) || isBlank(legalCap) || isBlank(legalProvince)) {
+        String legalStato = payload.path("legalAddress").path("stato").asText(null);
+        String legalRegion = payload.path("legalAddress").path("region").asText(null);
+        if (isBlank(legalStreet) || isBlank(legalCity) || isBlank(legalCap) || isBlank(legalProvince) || isBlank(legalStato) || isBlank(legalRegion)) {
             throw new IllegalArgumentException("S1 legalAddress fields are required");
         }
 

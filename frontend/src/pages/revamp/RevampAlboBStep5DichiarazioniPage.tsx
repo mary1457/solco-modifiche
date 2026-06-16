@@ -117,6 +117,10 @@ export function RevampAlboBStep5DichiarazioniPage() {
     setChecks(prev => ({ ...prev, [key]: !prev[key] }));
   }
 
+  function selectAllRequired() {
+    setChecks(Object.fromEntries(CHECKS_REQUIRED.map(c => [c.key, true])) as Record<CheckKey, boolean>);
+  }
+
   function allRequiredChecked() {
     return CHECKS_REQUIRED.every(c => checks[c.key]) && !!modello231;
   }
@@ -214,6 +218,18 @@ export function RevampAlboBStep5DichiarazioniPage() {
           </div>
 
           {/* Required checks */}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            {!allChecked && (
+              <button
+                type="button"
+                onClick={selectAllRequired}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: GREEN, color: "#fff", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                <CheckSquare size={15} />
+                Accetta tutte le obbligatorie
+              </button>
+            )}
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {CHECKS_REQUIRED.map(c => {
               const checked = checks[c.key];

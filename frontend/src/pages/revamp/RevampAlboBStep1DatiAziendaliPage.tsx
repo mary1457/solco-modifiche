@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Info, Save, Upload } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
@@ -96,6 +96,29 @@ const PROVINCE_IT = [
   { value: "VC", label: "Vercelli (VC)" }, { value: "VR", label: "Verona (VR)" },
   { value: "VV", label: "Vibo Valentia (VV)" }, { value: "VI", label: "Vicenza (VI)" },
   { value: "VT", label: "Viterbo (VT)" },
+];
+
+const REGIONI_IT = [
+  { value: "Abruzzo", label: "Abruzzo" },
+  { value: "Basilicata", label: "Basilicata" },
+  { value: "Calabria", label: "Calabria" },
+  { value: "Campania", label: "Campania" },
+  { value: "Emilia-Romagna", label: "Emilia-Romagna" },
+  { value: "Friuli-Venezia Giulia", label: "Friuli-Venezia Giulia" },
+  { value: "Lazio", label: "Lazio" },
+  { value: "Liguria", label: "Liguria" },
+  { value: "Lombardia", label: "Lombardia" },
+  { value: "Marche", label: "Marche" },
+  { value: "Molise", label: "Molise" },
+  { value: "Piemonte", label: "Piemonte" },
+  { value: "Puglia", label: "Puglia" },
+  { value: "Sardegna", label: "Sardegna" },
+  { value: "Sicilia", label: "Sicilia" },
+  { value: "Toscana", label: "Toscana" },
+  { value: "Trentino-Alto Adige", label: "Trentino-Alto Adige" },
+  { value: "Umbria", label: "Umbria" },
+  { value: "Valle d'Aosta", label: "Valle d'Aosta" },
+  { value: "Veneto", label: "Veneto" },
 ];
 
 function splitPhoneValue(value: string | undefined, fallbackCode = "+39"): { code: string; number: string } {
@@ -362,7 +385,7 @@ export function RevampAlboBStep1DatiAziendaliPage() {
   const [form, setForm] = useState({
     ragioneSociale: "", formaGiuridica: "", piva: "", codiceFiscale: "",
     rea: "", cciaa: "", dataCostituzione: "",
-    paeseLegale: "Italia", indirizzoLegale: "", comuneLegale: "", capLegale: "", provinciaLegale: "",
+    paeseLegale: "Italia", indirizzoLegale: "", comuneLegale: "", capLegale: "", provinciaLegale: "", statoLegale: "", regioneLegale: "",
     sedeOperativa: "",
     email: auth?.email ?? "", pec: "", telefonoCode: "+39", telefono: "", sitoWeb: "", linkedin: "",
     lrNomeCognome: "", lrCodiceFiscale: "", lrRuolo: "", lrIdDocumentExpiry: "",
@@ -375,6 +398,7 @@ export function RevampAlboBStep1DatiAziendaliPage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const isFirstRenderRef = useRef(true);
 
   async function getOrCreateAlboBApplicationId(): Promise<string> {
     if (fcr.active && fcr.fcrId) {
@@ -481,6 +505,8 @@ export function RevampAlboBStep1DatiAziendaliPage() {
         comuneLegale:     s1.comuneLegale     ?? prev.comuneLegale,
         capLegale:        s1.capLegale        ?? prev.capLegale,
         provinciaLegale:  s1.provinciaLegale  ?? prev.provinciaLegale,
+        statoLegale:      s1.statoLegale      ?? prev.statoLegale,
+        regioneLegale:    s1.regioneLegale    ?? prev.regioneLegale,
         sedeOperativa:    s1.sedeOperativa    ?? prev.sedeOperativa,
         email:            s1.email            ?? prev.email,
         pec:              s1.pec              ?? prev.pec,
@@ -519,6 +545,12 @@ export function RevampAlboBStep1DatiAziendaliPage() {
     }).catch(() => {});
   }, [auth?.token]);
 
+  useEffect(() => {
+    if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
+    const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [form, lrCartaIdentita]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function set(field: keyof typeof form): OnChange {
     return (e) => {
       setForm(prev => ({ ...prev, [field]: e.target.value }));
@@ -550,6 +582,7 @@ export function RevampAlboBStep1DatiAziendaliPage() {
     if (!form.comuneLegale.trim()) e.comuneLegale = "Campo obbligatorio.";
     if (!form.capLegale.trim()) e.capLegale = "Campo obbligatorio.";
     if (!form.provinciaLegale.trim()) e.provinciaLegale = "Campo obbligatorio.";
+    if (!form.regioneLegale.trim()) e.regioneLegale = "Campo obbligatorio.";
     if (!form.email.trim()) { e.email = "Campo obbligatorio."; }
     else if (!EMAIL_RE.test(form.email.trim())) { e.email = "Indirizzo email non valido."; }
     if (!form.pec.trim()) { e.pec = "Campo obbligatorio."; }
@@ -675,6 +708,8 @@ export function RevampAlboBStep1DatiAziendaliPage() {
         city:     form.comuneLegale,
         cap:      form.capLegale,
         province: form.provinciaLegale,
+        stato:    form.statoLegale,
+        region:   form.regioneLegale,
       },
     };
   }
@@ -805,10 +840,14 @@ export function RevampAlboBStep1DatiAziendaliPage() {
               <Field label="Paese" required value={form.paeseLegale} onChange={set("paeseLegale")} error={errors.paeseLegale} placeholder="Italia" />
               <Field label="Indirizzo" required value={form.indirizzoLegale} onChange={set("indirizzoLegale")} error={errors.indirizzoLegale} placeholder="Via Roma, 1" />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.8fr 1.15fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.8fr", gap: 16, marginBottom: 12 }}>
               <Field label="Citta / Comune" required value={form.comuneLegale} onChange={set("comuneLegale")} error={errors.comuneLegale} placeholder="Milano" />
               <Field label="Codice postale" required value={form.capLegale} onChange={set("capLegale")} error={errors.capLegale} placeholder="20121" />
-              <Field label="Provincia / Stato / Regione" required value={form.provinciaLegale} onChange={set("provinciaLegale")} error={errors.provinciaLegale} placeholder="MI, Lombardia, NY..." />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <SelectField label="Provincia" required value={form.provinciaLegale} onChange={set("provinciaLegale")} error={errors.provinciaLegale} options={PROVINCE_IT} />
+              <Field label="Stato" required value={form.statoLegale} onChange={set("statoLegale")} error={errors.statoLegale} placeholder="Italia" />
+              <SelectField label="Regione" required value={form.regioneLegale} onChange={set("regioneLegale")} error={errors.regioneLegale} options={REGIONI_IT} />
             </div>
             </fieldset>
             <fieldset disabled={integrationIdentityOnly || fcrLocked("sede_operativa")} className={integrationIdentityOnly ? "fcr-locked" : fcrGroupClass("sede_operativa")}>

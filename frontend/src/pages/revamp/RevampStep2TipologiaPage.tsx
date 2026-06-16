@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Save } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
@@ -239,6 +239,7 @@ export function RevampStep2TipologiaPage() {
   const [atecoError,     setAtecoError]     = useState(false);
   const [savedAt,        setSavedAt]        = useState<string | null>(null);
   const [mainError,      setMainError]      = useState(false);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -268,6 +269,12 @@ export function RevampStep2TipologiaPage() {
       return getRevampApplicationSections(app.id, auth!.token!).then(applyS2);
     }).catch(() => {});
   }, [auth?.token, registryType]);
+
+  useEffect(() => {
+    if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
+    const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [selected, secondaryRoles, atecoQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSave() {
     const now = new Date();

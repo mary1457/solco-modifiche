@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Save } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
@@ -119,6 +119,7 @@ export function RevampAlboBStep3ServiziPage() {
   });
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -159,6 +160,12 @@ export function RevampAlboBStep3ServiziPage() {
       return getRevampApplicationSections(app.id, auth!.token!).then(applyS3);
     }).catch(() => {});
   }, [auth?.token]);
+
+  useEffect(() => {
+    if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
+    const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [vociSelezionate, descrizioni]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleVoce(cat: CatKey, voce: string) {
     setVociSelezionate(prev => {

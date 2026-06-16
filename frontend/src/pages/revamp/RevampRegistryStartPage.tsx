@@ -40,6 +40,86 @@ const REGIMI_FISCALI = [
   { value: "altro",       label: "Altro (specificare)" },
 ];
 
+const PROVINCE_IT = [
+  { value: "AG", label: "Agrigento (AG)" }, { value: "AL", label: "Alessandria (AL)" },
+  { value: "AN", label: "Ancona (AN)" }, { value: "AO", label: "Aosta (AO)" },
+  { value: "AQ", label: "L'Aquila (AQ)" }, { value: "AR", label: "Arezzo (AR)" },
+  { value: "AP", label: "Ascoli Piceno (AP)" }, { value: "AT", label: "Asti (AT)" },
+  { value: "AV", label: "Avellino (AV)" }, { value: "BA", label: "Bari (BA)" },
+  { value: "BT", label: "Barletta-Andria-Trani (BT)" }, { value: "BL", label: "Belluno (BL)" },
+  { value: "BN", label: "Benevento (BN)" }, { value: "BG", label: "Bergamo (BG)" },
+  { value: "BI", label: "Biella (BI)" }, { value: "BO", label: "Bologna (BO)" },
+  { value: "BZ", label: "Bolzano (BZ)" }, { value: "BS", label: "Brescia (BS)" },
+  { value: "BR", label: "Brindisi (BR)" }, { value: "CA", label: "Cagliari (CA)" },
+  { value: "CL", label: "Caltanissetta (CL)" }, { value: "CB", label: "Campobasso (CB)" },
+  { value: "CE", label: "Caserta (CE)" }, { value: "CT", label: "Catania (CT)" },
+  { value: "CZ", label: "Catanzaro (CZ)" }, { value: "CH", label: "Chieti (CH)" },
+  { value: "CO", label: "Como (CO)" }, { value: "CS", label: "Cosenza (CS)" },
+  { value: "CR", label: "Cremona (CR)" }, { value: "KR", label: "Crotone (KR)" },
+  { value: "CN", label: "Cuneo (CN)" }, { value: "EN", label: "Enna (EN)" },
+  { value: "FM", label: "Fermo (FM)" }, { value: "FE", label: "Ferrara (FE)" },
+  { value: "FI", label: "Firenze (FI)" }, { value: "FG", label: "Foggia (FG)" },
+  { value: "FC", label: "Forlì-Cesena (FC)" }, { value: "FR", label: "Frosinone (FR)" },
+  { value: "GE", label: "Genova (GE)" }, { value: "GO", label: "Gorizia (GO)" },
+  { value: "GR", label: "Grosseto (GR)" }, { value: "IM", label: "Imperia (IM)" },
+  { value: "IS", label: "Isernia (IS)" }, { value: "SP", label: "La Spezia (SP)" },
+  { value: "LT", label: "Latina (LT)" }, { value: "LE", label: "Lecce (LE)" },
+  { value: "LC", label: "Lecco (LC)" }, { value: "LI", label: "Livorno (LI)" },
+  { value: "LO", label: "Lodi (LO)" }, { value: "LU", label: "Lucca (LU)" },
+  { value: "MC", label: "Macerata (MC)" }, { value: "MN", label: "Mantova (MN)" },
+  { value: "MS", label: "Massa-Carrara (MS)" }, { value: "MT", label: "Matera (MT)" },
+  { value: "ME", label: "Messina (ME)" }, { value: "MI", label: "Milano (MI)" },
+  { value: "MO", label: "Modena (MO)" }, { value: "MB", label: "Monza e Brianza (MB)" },
+  { value: "NA", label: "Napoli (NA)" }, { value: "NO", label: "Novara (NO)" },
+  { value: "NU", label: "Nuoro (NU)" }, { value: "OR", label: "Oristano (OR)" },
+  { value: "PD", label: "Padova (PD)" }, { value: "PA", label: "Palermo (PA)" },
+  { value: "PR", label: "Parma (PR)" }, { value: "PV", label: "Pavia (PV)" },
+  { value: "PG", label: "Perugia (PG)" }, { value: "PU", label: "Pesaro e Urbino (PU)" },
+  { value: "PE", label: "Pescara (PE)" }, { value: "PC", label: "Piacenza (PC)" },
+  { value: "PI", label: "Pisa (PI)" }, { value: "PT", label: "Pistoia (PT)" },
+  { value: "PN", label: "Pordenone (PN)" }, { value: "PZ", label: "Potenza (PZ)" },
+  { value: "PO", label: "Prato (PO)" }, { value: "RG", label: "Ragusa (RG)" },
+  { value: "RA", label: "Ravenna (RA)" }, { value: "RC", label: "Reggio Calabria (RC)" },
+  { value: "RE", label: "Reggio Emilia (RE)" }, { value: "RI", label: "Rieti (RI)" },
+  { value: "RN", label: "Rimini (RN)" }, { value: "RM", label: "Roma (RM)" },
+  { value: "RO", label: "Rovigo (RO)" }, { value: "SA", label: "Salerno (SA)" },
+  { value: "SS", label: "Sassari (SS)" }, { value: "SV", label: "Savona (SV)" },
+  { value: "SI", label: "Siena (SI)" }, { value: "SR", label: "Siracusa (SR)" },
+  { value: "SO", label: "Sondrio (SO)" }, { value: "SU", label: "Sud Sardegna (SU)" },
+  { value: "TA", label: "Taranto (TA)" }, { value: "TE", label: "Teramo (TE)" },
+  { value: "TR", label: "Terni (TR)" }, { value: "TO", label: "Torino (TO)" },
+  { value: "TP", label: "Trapani (TP)" }, { value: "TN", label: "Trento (TN)" },
+  { value: "TV", label: "Treviso (TV)" }, { value: "TS", label: "Trieste (TS)" },
+  { value: "UD", label: "Udine (UD)" }, { value: "VA", label: "Varese (VA)" },
+  { value: "VE", label: "Venezia (VE)" }, { value: "VB", label: "Verbano-Cusio-Ossola (VB)" },
+  { value: "VC", label: "Vercelli (VC)" }, { value: "VR", label: "Verona (VR)" },
+  { value: "VV", label: "Vibo Valentia (VV)" }, { value: "VI", label: "Vicenza (VI)" },
+  { value: "VT", label: "Viterbo (VT)" },
+];
+
+const REGIONI_IT = [
+  { value: "Abruzzo", label: "Abruzzo" },
+  { value: "Basilicata", label: "Basilicata" },
+  { value: "Calabria", label: "Calabria" },
+  { value: "Campania", label: "Campania" },
+  { value: "Emilia-Romagna", label: "Emilia-Romagna" },
+  { value: "Friuli-Venezia Giulia", label: "Friuli-Venezia Giulia" },
+  { value: "Lazio", label: "Lazio" },
+  { value: "Liguria", label: "Liguria" },
+  { value: "Lombardia", label: "Lombardia" },
+  { value: "Marche", label: "Marche" },
+  { value: "Molise", label: "Molise" },
+  { value: "Piemonte", label: "Piemonte" },
+  { value: "Puglia", label: "Puglia" },
+  { value: "Sardegna", label: "Sardegna" },
+  { value: "Sicilia", label: "Sicilia" },
+  { value: "Toscana", label: "Toscana" },
+  { value: "Trentino-Alto Adige", label: "Trentino-Alto Adige" },
+  { value: "Umbria", label: "Umbria" },
+  { value: "Valle d'Aosta", label: "Valle d'Aosta" },
+  { value: "Veneto", label: "Veneto" },
+];
+
 /* Regimes where PIVA is mandatory */
 const PIVA_REQUIRED_REGIMES = new Set(["ordinario", "forfettario", "ditta"]);
 
@@ -383,6 +463,7 @@ export function RevampRegistryStartPage() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const isFirstRenderRef = useRef(true);
 
   async function getOrCreateApplicationId(type: RegistryType): Promise<string> {
     const fcrSession = loadRevampFcrEditSession();
@@ -497,6 +578,12 @@ export function RevampRegistryStartPage() {
   }, [profilePhotoPreviewUrl]);
 
   useEffect(() => {
+    if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
+    const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [form, profilePhotoAttachment]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!auth?.token || !registryType) return;
     const field = registryType === "ALBO_A" ? "taxCode" : "vatNumber";
     const value = registryType === "ALBO_A" ? form.taxCode : form.vatNumber;
@@ -583,6 +670,7 @@ export function RevampRegistryStartPage() {
       }
       const result = await uploadRevampAttachment(appId, file, auth.token);
       setProfilePhotoAttachment(result);
+      setErrors(prev => { const n = { ...prev }; delete n.cartaIdentita; return n; });
     } catch {
       setPhotoError("Caricamento non riuscito. Riprova.");
       setProfilePhotoPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
@@ -751,7 +839,7 @@ export function RevampRegistryStartPage() {
       taxRegime: form.taxRegime, taxRegimeOther: form.taxRegimeOther, email: form.email,
       phone: composePhoneValue(form.phoneCode, form.phone), country: form.country, address: form.address, addressLine: form.address, streetNumber: form.streetNumber,
       city: form.city, postalCode: form.postalCode,
-      province: form.province, linkedin: form.linkedin,
+      province: form.province, stato: form.stato, region: form.region, linkedin: form.linkedin,
       secondaryPhone: composePhoneValue(form.phoneSecondaryCode, form.phoneSecondary),
       secondaryEmail: form.emailSecondary,
       pec: form.pec,
@@ -775,7 +863,7 @@ export function RevampRegistryStartPage() {
       taxRegime: form.taxRegime, email: form.email,
       phone: composePhoneValue(form.phoneCode, form.phone), country: form.country, address: form.address, addressLine: form.address, streetNumber: form.streetNumber,
       city: form.city, postalCode: form.postalCode,
-      province: form.province, linkedin: form.linkedin,
+      province: form.province, stato: form.stato, region: form.region, linkedin: form.linkedin,
       secondaryPhone: composePhoneValue(form.phoneSecondaryCode, form.phoneSecondary),
       secondaryEmail: form.emailSecondary,
       pec: form.pec,
@@ -1089,9 +1177,9 @@ export function RevampRegistryStartPage() {
               <Field label="Codice postale" required value={form.postalCode} onChange={set("postalCode")} error={errors.postalCode} placeholder="20121" />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-              <Field label="Provincia" required value={form.province} onChange={set("province")} error={errors.province} placeholder="MI" />
+              <SelectField label="Provincia" required value={form.province} onChange={set("province")} error={errors.province} options={PROVINCE_IT} />
               <Field label="Stato" required value={form.stato} onChange={set("stato")} error={errors.stato} placeholder="Italia" />
-              <Field label="Regione" required value={form.region} onChange={set("region")} error={errors.region} placeholder="Lombardia" />
+              <SelectField label="Regione" required value={form.region} onChange={set("region")} error={errors.region} options={REGIONI_IT} />
             </div>
             </fieldset>
 

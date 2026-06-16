@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, CheckCircle, Info, Lock, Save, Upload } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
@@ -206,6 +206,7 @@ export function RevampAlboBStep4CertificazioniPage() {
   const [manualErrors,  setManualErrors]  = useState<Record<string, string>>({});
   const [savedAt,       setSavedAt]       = useState<string | null>(null);
   const [uploadError,   setUploadError]   = useState<string | null>(null);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -291,6 +292,12 @@ export function RevampAlboBStep4CertificazioniPage() {
       return getRevampApplicationSections(app.id, auth!.token!).then(applyS4);
     }).catch(() => {});
   }, [auth?.token, renewalEdit?.applicationId]);
+
+  useEffect(() => {
+    if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
+    const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
+    return () => clearTimeout(timer);
+  }, [certs, altreCert, accFormazione, accRegioni, accTipo, accLavoro, visura, visuraScadenza, companyProf, durc, durcScadenza, certAlleg]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateCert(key: string, field: keyof CertRecord, value: string) {
     setCerts(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
