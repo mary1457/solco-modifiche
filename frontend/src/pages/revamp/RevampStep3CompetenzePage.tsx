@@ -14,8 +14,6 @@ const NAVY  = "#0f2a52";
 const GREEN = "#1a5c3a";
 const MUTED = "#6b7280";
 const ERR   = "#dc2626";
-const WARN_BG     = "#fffbeb";
-const WARN_BORDER = "#f59e0b";
 
 const STEPS = ["Anagrafica", "Tipologia", "Competenze", "Disponibilità", "Dichiarazioni"];
 
@@ -32,11 +30,11 @@ const TITOLI_STUDIO = [
 ];
 
 const ANNI_DOC = [
-  { value: "meno1",   label: "meno di 1 anno" },
-  { value: "1_5",     label: "1–5 anni" },
-  { value: "5_10",    label: "5–10 anni" },
-  { value: "10_15",   label: "10–15 anni" },
-  { value: "oltre15", label: "oltre 15 anni" },
+  { value: "meno1",   label: "Meno di 1" },
+  { value: "1_5",     label: "1–5" },
+  { value: "6_10",    label: "6–10" },
+  { value: "11_15",   label: "11–15" },
+  { value: "oltre16", label: "Oltre 16" },
 ];
 
 const ANNI_PROF = [
@@ -45,6 +43,13 @@ const ANNI_PROF = [
   { value: "6_10",    label: "6–10 anni" },
   { value: "11_15",   label: "11–15 anni" },
   { value: "oltre16", label: "Oltre 16 anni" },
+];
+
+const REGIONI_IT = [
+  "Abruzzo","Basilicata","Calabria","Campania","Emilia-Romagna",
+  "Friuli-Venezia Giulia","Lazio","Liguria","Lombardia","Marche",
+  "Molise","Piemonte","Puglia","Sardegna","Sicilia","Toscana",
+  "Trentino-Alto Adige","Umbria","Valle d'Aosta","Veneto",
 ];
 
 /* ─── 3A: aree tematiche ─────────────────────────── */
@@ -98,11 +103,12 @@ const SERVIZI_MAP: Record<string, string[]> = {
 };
 
 /* ─── types ──────────────────────────────────────── */
-type AreaState = { checked: boolean; specifica: string; anni: string };
+type AreaEntry = { specifica: string; anni: string };
+type AreaState = { checked: boolean; entries: AreaEntry[] };
 type AreasMap  = Record<string, AreaState>;
 
 function initAree(): AreasMap {
-  return Object.fromEntries(AREE_TEMATICHE.map(a => [a.id, { checked: false, specifica: "", anni: "" }]));
+  return Object.fromEntries(AREE_TEMATICHE.map(a => [a.id, { checked: false, entries: [{ specifica: "", anni: "" }] }]));
 }
 
 /* ─── shared ui helpers ──────────────────────────── */
@@ -295,8 +301,9 @@ export function RevampStep3CompetenzePage() {
   const [aree,             setAree]            = useState<AreasMap>(initAree);
   const [docenzaPA,        setDocenzaPA]       = useState("");
   const [consulenza,       setConsulenza]      = useState<Set<string>>(new Set());
-  const [areaTerritoriale, setAreaTerritoriale]= useState("");
-  const [lingue,           setLingue]          = useState("");
+  const [tuttaItaliaA,     setTuttaItaliaA]    = useState(false);
+  const [regioniA,         setRegioniA]        = useState<Set<string>>(new Set());
+  const [lingue,           setLingue]          = useState<string[]>([""]);
   const [lingueDocenza,    setLingueDocenza]   = useState("");
   const [strumenti,        setStrumenti]       = useState("");
   const [reti,             setReti]            = useState("");
@@ -331,16 +338,24 @@ export function RevampStep3CompetenzePage() {
       if (s3.annoConseg)        setAnnoConseg(s3.annoConseg as string);
       if (s3.certAbitazioni)    setCertAbitazioni(s3.certAbitazioni as string);
       if (Array.isArray(s3.aree) && s3.aree.length) {
+        const savedEntries = ((s3.areeEntries ?? {}) as Record<string, AreaEntry[]>);
         setAree(prev => {
           const n = { ...prev };
-          (s3.aree as string[]).forEach(id => { if (n[id]) n[id] = { ...n[id], checked: true }; });
+          (s3.aree as string[]).forEach(id => {
+            if (n[id]) {
+              const entries = savedEntries[id];
+              n[id] = { checked: true, entries: (entries && entries.length) ? entries : [{ specifica: "", anni: "" }] };
+            }
+          });
           return n;
         });
       }
       if (s3.docenzaPA)         setDocenzaPA(s3.docenzaPA as string);
       if (Array.isArray(s3.consulenza)) setConsulenza(new Set(s3.consulenza as string[]));
-      if (s3.areaTerritoriale)  setAreaTerritoriale(s3.areaTerritoriale as string);
-      if (s3.lingue)            setLingue(s3.lingue as string);
+      if (s3.tuttaItaliaA === true) { setTuttaItaliaA(true); }
+      else if (Array.isArray(s3.regioniA) && (s3.regioniA as string[]).length) { setRegioniA(new Set(s3.regioniA as string[])); }
+      if (Array.isArray(s3.lingue) && (s3.lingue as string[]).length) setLingue(s3.lingue as string[]);
+      else if (s3.lingue && typeof s3.lingue === "string") setLingue([s3.lingue as string]);
       if (s3.lingueDocenza)     setLingueDocenza(s3.lingueDocenza as string);
       if (s3.strumenti)         setStrumenti(s3.strumenti as string);
       if (s3.reti)              setReti(s3.reti as string);
@@ -370,7 +385,7 @@ export function RevampStep3CompetenzePage() {
     if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
     const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
     return () => clearTimeout(timer);
-  }, [titoloStudio, ambitoStudio, annoConseg, certAbitazioni, aree, docenzaPA, consulenza, areaTerritoriale, lingue, lingueDocenza, strumenti, reti, ordine, titoloB, ambitoB, anniEsp, servizi, altroServ, certB]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [titoloStudio, ambitoStudio, annoConseg, certAbitazioni, aree, docenzaPA, consulenza, tuttaItaliaA, regioniA, lingue, lingueDocenza, strumenti, reti, ordine, titoloB, ambitoB, anniEsp, servizi, altroServ, certB]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearErr(key: string) {
     setErrors(p => { const n = { ...p }; delete n[key]; return n; });
@@ -387,9 +402,10 @@ export function RevampStep3CompetenzePage() {
       const appId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
       if (!appId) return;
       const areeChecked = AREE_TEMATICHE.filter(a => aree[a.id].checked).map(a => a.id);
+      const areeEntries = Object.fromEntries(areeChecked.map(id => [id, aree[id].entries]));
       const draftPayload = JSON.stringify({
         titoloStudio, ambitoStudio, annoConseg, certAbitazioni,
-        aree: areeChecked, areaTerritoriale, lingue, lingueDocenza, strumenti, reti,
+        aree: areeChecked, areeEntries, tuttaItaliaA, regioniA: Array.from(regioniA), lingue, lingueDocenza, strumenti, reti,
         docenzaPA, consulenza: Array.from(consulenza),
         titoloB, ambitoB, anniEsp, ordine, certB,
         servizi: Array.from(servizi), altroServ,
@@ -404,10 +420,22 @@ export function RevampStep3CompetenzePage() {
     setAree(prev => ({ ...prev, [id]: { ...prev[id], checked: !prev[id].checked } }));
     clearErr("aree");
   }
-  function setAreaField(id: string, f: "specifica" | "anni", v: string) {
-    setAree(prev => ({ ...prev, [id]: { ...prev[id], [f]: v } }));
-    clearErr(`specifica_${id}`);
-    clearErr(`anni_${id}`);
+  function setEntryField(id: string, idx: number, f: "specifica" | "anni", v: string) {
+    setAree(prev => {
+      const entries = prev[id].entries.map((e, i) => i === idx ? { ...e, [f]: v } : e);
+      return { ...prev, [id]: { ...prev[id], entries } };
+    });
+    clearErr(`specifica_${id}_${idx}`);
+    clearErr(`anni_${id}_${idx}`);
+  }
+  function addEntry(id: string) {
+    setAree(prev => ({ ...prev, [id]: { ...prev[id], entries: [...prev[id].entries, { specifica: "", anni: "" }] } }));
+  }
+  function removeEntry(id: string, idx: number) {
+    setAree(prev => {
+      const entries = prev[id].entries.filter((_, i) => i !== idx);
+      return { ...prev, [id]: { ...prev[id], entries: entries.length ? entries : [{ specifica: "", anni: "" }] } };
+    });
   }
   function toggleConsulenza(v: string) {
     setConsulenza(prev => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; });
@@ -422,20 +450,22 @@ export function RevampStep3CompetenzePage() {
     const appId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
     if (!appId) throw new Error("Candidatura non trovata.");
     const areeChecked = AREE_TEMATICHE.filter(a => aree[a.id].checked).map(a => a.id);
+    const areeEntries = Object.fromEntries(areeChecked.map(id => [id, aree[id].entries]));
     const frontendPayload = {
       titoloStudio, ambitoStudio, annoConseg, certAbitazioni,
-      aree: areeChecked,
-      areaTerritoriale, lingue, lingueDocenza, strumenti, reti,
+      aree: areeChecked, areeEntries,
+      tuttaItaliaA, regioniA: Array.from(regioniA), lingue, lingueDocenza, strumenti, reti,
       docenzaPA, consulenza: Array.from(consulenza),
       titoloB, ambitoB, anniEsp, ordine, certB,
       servizi: Array.from(servizi), altroServ,
     };
+    const presentationStr = tuttaItaliaA ? "Tutta Italia" : Array.from(regioniA).join(", ");
     if (isA && isDocente) {
       await saveRevampApplicationSection(appId, "S3A", JSON.stringify({
         ...frontendPayload,
         thematicAreasCsv: areeChecked.join(","),
         education: { highestTitle: titoloStudio, studyArea: ambitoStudio, graduationYear: annoConseg },
-        presentation: areaTerritoriale,
+        presentation: presentationStr,
       }), true, auth.token);
       return;
     }
@@ -471,12 +501,14 @@ export function RevampStep3CompetenzePage() {
       for (const area of AREE_TEMATICHE) {
         const st = aree[area.id];
         if (st.checked) {
-          if (!st.specifica.trim()) e[`specifica_${area.id}`] = "Obbligatorio.";
-          if (!st.anni)             e[`anni_${area.id}`]      = "Obbligatorio.";
+          st.entries.forEach((entry, idx) => {
+            if (!entry.specifica.trim()) e[`specifica_${area.id}_${idx}`] = "Obbligatorio.";
+            if (!entry.anni)             e[`anni_${area.id}_${idx}`]      = "Obbligatorio.";
+          });
         }
       }
       if (!docenzaPA) e.docenzaPA = "Campo obbligatorio.";
-      if (!areaTerritoriale.trim()) e.areaTerritoriale = "Campo obbligatorio.";
+      if (!tuttaItaliaA && regioniA.size === 0) e.regioniA = "Seleziona almeno una regione di operatività.";
     } else {
       if (!titoloB)          e.titoloB   = "Campo obbligatorio.";
       if (!ambitoB.trim())   e.ambitoB   = "Campo obbligatorio.";
@@ -491,14 +523,16 @@ export function RevampStep3CompetenzePage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     handleSave();
     const areeChecked = AREE_TEMATICHE.filter(a => aree[a.id].checked).map(a => a.id);
+    const areeEntries = Object.fromEntries(areeChecked.map(id => [id, aree[id].entries]));
     const frontendPayload = {
       titoloStudio, ambitoStudio, annoConseg, certAbitazioni,
-      aree: areeChecked,
-      areaTerritoriale, lingue, lingueDocenza, strumenti, reti,
+      aree: areeChecked, areeEntries,
+      tuttaItaliaA, regioniA: Array.from(regioniA), lingue, lingueDocenza, strumenti, reti,
       docenzaPA, consulenza: Array.from(consulenza),
       titoloB, ambitoB, anniEsp, ordine, certB,
       servizi: Array.from(servizi), altroServ,
     };
+    const presentationStr = tuttaItaliaA ? "Tutta Italia" : Array.from(regioniA).join(", ");
     sessionStorage.setItem("revamp_s3", JSON.stringify(frontendPayload));
     let savedAppId: string | null = null;
     if (auth?.token) {
@@ -512,7 +546,7 @@ export function RevampStep3CompetenzePage() {
               ...frontendPayload,
               thematicAreasCsv: areeChecked.join(","),
               education: { highestTitle: titoloStudio, studyArea: ambitoStudio, graduationYear: annoConseg },
-              presentation: areaTerritoriale,
+              presentation: presentationStr,
             };
             await saveRevampApplicationSection(appId, "S3A", JSON.stringify(s3aPayload), true, auth.token);
           } else if (isA && !isDocente) {
@@ -552,9 +586,6 @@ export function RevampStep3CompetenzePage() {
 
   const checkedAree  = AREE_TEMATICHE.filter(a => aree[a.id].checked).length;
   const serviziList  = SERVIZI_MAP[tipologia] ?? [];
-  const errorCount   = Object.keys(errors).length;
-  const areaErrors   = Object.keys(errors).filter(k => k.startsWith("specifica_") || k.startsWith("anni_")).length;
-  const mainErrors   = errorCount - areaErrors;
 
   return (
     <div style={{ margin: "-1rem", background: "#f0f4f8", minHeight: "100%" }}>
@@ -617,7 +648,7 @@ export function RevampStep3CompetenzePage() {
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
                 {AREE_TEMATICHE.map((area, idx) => {
                   const st = aree[area.id];
-                  const hasFieldErr = !!(errors[`specifica_${area.id}`] || errors[`anni_${area.id}`]);
+                  const hasFieldErr = st.entries.some((_, i) => !!(errors[`specifica_${area.id}_${i}`] || errors[`anni_${area.id}_${i}`]));
                   return (
                     <div key={area.id} style={{ borderBottom: idx < AREE_TEMATICHE.length - 1 ? "1px solid #f3f4f6" : "none" }}>
                       <div onClick={() => toggleArea(area.id)}
@@ -629,24 +660,39 @@ export function RevampStep3CompetenzePage() {
                         {hasFieldErr && <span style={{ fontSize: "0.7rem", color: ERR }}>● compila i campi</span>}
                       </div>
                       {st.checked && (
-                        <div style={{ padding: "0 14px 14px 42px", display: "grid", gridTemplateColumns: "1fr 170px", gap: 10 }}>
-                          <div style={COL}>
-                            <span style={LBL}>Specifica tematiche <span style={{ color: ERR }}>*</span></span>
-                            <textarea value={st.specifica}
-                              onChange={e => setAreaField(area.id, "specifica", e.target.value)}
-                              placeholder="Indica i sottotemi specifici trattati..."
-                              rows={2}
-                              style={{ ...s_textarea(!!errors[`specifica_${area.id}`]), minHeight: 52 }} />
-                            {errors[`specifica_${area.id}`] && <span style={ERRTXT}>{errors[`specifica_${area.id}`]}</span>}
-                          </div>
-                          <div style={COL}>
-                            <span style={LBL}>Anni di esperienza <span style={{ color: ERR }}>*</span></span>
-                            <select value={st.anni} onChange={e => setAreaField(area.id, "anni", e.target.value)} style={s_input(!!errors[`anni_${area.id}`])}>
-                              <option value="">Seleziona...</option>
-                              {ANNI_DOC.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
-                            {errors[`anni_${area.id}`] && <span style={ERRTXT}>{errors[`anni_${area.id}`]}</span>}
-                          </div>
+                        <div style={{ padding: "0 14px 14px 42px" }}>
+                          {st.entries.map((entry, eIdx) => (
+                            <div key={eIdx} style={{ display: "grid", gridTemplateColumns: "1fr 170px 32px", gap: 10, marginBottom: eIdx < st.entries.length - 1 ? 10 : 0 }}>
+                              <div style={COL}>
+                                {eIdx === 0 && <span style={LBL}>Specifica tematiche <span style={{ color: ERR }}>*</span></span>}
+                                <input type="text" value={entry.specifica}
+                                  onChange={e => setEntryField(area.id, eIdx, "specifica", e.target.value)}
+                                  placeholder="Indica i sottotemi specifici trattati..."
+                                  style={s_input(!!errors[`specifica_${area.id}_${eIdx}`])} />
+                                {errors[`specifica_${area.id}_${eIdx}`] && <span style={ERRTXT}>{errors[`specifica_${area.id}_${eIdx}`]}</span>}
+                              </div>
+                              <div style={COL}>
+                                {eIdx === 0 && <span style={LBL}>Anni di esperienza <span style={{ color: ERR }}>*</span></span>}
+                                <select value={entry.anni} onChange={e => setEntryField(area.id, eIdx, "anni", e.target.value)} style={s_input(!!errors[`anni_${area.id}_${eIdx}`])}>
+                                  <option value="">Seleziona...</option>
+                                  {ANNI_DOC.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                </select>
+                                {errors[`anni_${area.id}_${eIdx}`] && <span style={ERRTXT}>{errors[`anni_${area.id}_${eIdx}`]}</span>}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center" }}>
+                                {eIdx > 0 ? (
+                                  <button type="button" onClick={() => removeEntry(area.id, eIdx)}
+                                    style={{ width: 28, height: 28, border: "1.5px solid #e5e7eb", borderRadius: 6, background: "#fff", color: ERR, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                    ×
+                                  </button>
+                                ) : <span style={{ width: 28 }} />}
+                              </div>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => addEntry(area.id)}
+                            style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 5, fontSize: "0.8rem", color: accent, background: "none", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 600 }}>
+                            + Aggiungi tematica
+                          </button>
                         </div>
                       )}
                     </div>
@@ -684,28 +730,60 @@ export function RevampStep3CompetenzePage() {
 
               {/* Area territoriale */}
               <SubLabel label="Area territoriale di attività in presenza" accent={accent} />
-              <Textarea label="Regioni e/o Province in cui sei disponibile a operare in presenza" required
-                value={areaTerritoriale} onChange={e => { setAreaTerritoriale(e.target.value); clearErr("areaTerritoriale"); }}
-                placeholder="Es. MI, TO, GE — oppure: Lombardia, Piemonte, tutta Italia"
-                error={errors.areaTerritoriale} rows={2} />
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 14, cursor: "pointer", padding: "7px 16px", borderRadius: 6, background: tuttaItaliaA ? accent : "#eff6ff", border: `1.5px solid ${tuttaItaliaA ? accent : "#93c5fd"}`, fontWeight: 700, fontSize: "0.84rem", color: tuttaItaliaA ? "#fff" : accent, transition: "background .15s, color .15s", userSelect: "none" }}>
+                <input type="checkbox" checked={tuttaItaliaA} onChange={() => { setTuttaItaliaA(v => !v); if (!tuttaItaliaA) setRegioniA(new Set()); clearErr("regioniA"); }} style={{ accentColor: "#fff", width: 15, height: 15 }} />
+                Tutta Italia
+              </label>
+              {!tuttaItaliaA && (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 8 }}>
+                    {REGIONI_IT.map(r => (
+                      <label key={r} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem", cursor: "pointer", padding: "6px 8px", borderRadius: 6, background: regioniA.has(r) ? `${accent}0d` : "#f9fafb", border: `1px solid ${regioniA.has(r) ? accent : "#e5e7eb"}`, transition: "background .12s" }}>
+                        <input type="checkbox" checked={regioniA.has(r)} onChange={() => { setRegioniA(prev => { const n = new Set(prev); n.has(r) ? n.delete(r) : n.add(r); return n; }); clearErr("regioniA"); }} style={{ accentColor: accent }} /> {r}
+                      </label>
+                    ))}
+                  </div>
+                  {regioniA.size > 0 && <div style={{ fontSize: "0.78rem", color: "#16a34a", marginBottom: 4 }}>✓ {regioniA.size} {regioniA.size === 1 ? "regione selezionata" : "regioni selezionate"}</div>}
+                </>
+              )}
+              {errors.regioniA && <div style={{ fontSize: "0.74rem", color: ERR, marginBottom: 12 }}>{errors.regioniA}</div>}
 
               {/* Lingue e strumenti */}
               <SubLabel label="Lingue, strumenti digitali e reti professionali" accent={accent} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                <Textarea label="Lingue parlate (oltre all'italiano) e livello QCER" hint="opzionale"
-                  value={lingue} onChange={e => setLingue(e.target.value)}
-                  placeholder="Es. Inglese B2, Francese B1, Spagnolo A1..." rows={2} />
-                <Textarea label="Lingue straniere in cui può erogare docenza" hint="opzionale"
-                  value={lingueDocenza} onChange={e => setLingueDocenza(e.target.value)}
-                  placeholder="Es. Inglese, Francese..." rows={2} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Textarea label="Strumenti digitali rilevanti" hint="opzionale"
-                  value={strumenti} onChange={e => setStrumenti(e.target.value)}
-                  placeholder="Es. Mural, Mentimeter, MS Teams, Zoom, Power BI, Canva..." rows={2} />
-                <Textarea label="Partecipazione a reti professionali o associazioni" hint="opzionale"
-                  value={reti} onChange={e => setReti(e.target.value)}
-                  placeholder="Es. AIF, AIDP, AIFOS, Federmanager..." rows={2} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={COL}>
+                  <span style={LBL}>Lingue parlate (oltre all'italiano) e livello QCER <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
+                  {lingue.map((val, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < lingue.length - 1 ? 6 : 0 }}>
+                      <input type="text" value={val}
+                        onChange={e => setLingue(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}
+                        placeholder="Es. Inglese B2"
+                        style={s_input()} />
+                      {i > 0 && (
+                        <button type="button" onClick={() => setLingue(prev => prev.filter((_, idx) => idx !== i))}
+                          style={{ width: 28, height: 28, border: "1.5px solid #e5e7eb", borderRadius: 6, background: "#fff", color: ERR, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setLingue(prev => [...prev, ""])}
+                    style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 5, fontSize: "0.8rem", color: accent, background: "none", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 600, alignSelf: "flex-start" }}>
+                    + Aggiungi lingua
+                  </button>
+                </div>
+                <div style={COL}>
+                  <span style={LBL}>Lingue straniere in cui può erogare docenza <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
+                  <input type="text" value={lingueDocenza} onChange={e => setLingueDocenza(e.target.value)} maxLength={200} placeholder="Es. Inglese, Francese..." style={s_input()} />
+                </div>
+                <div style={COL}>
+                  <span style={LBL}>Strumenti digitali rilevanti <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
+                  <input type="text" value={strumenti} onChange={e => setStrumenti(e.target.value)} maxLength={200} placeholder="Es. Mural, Mentimeter, MS Teams, Zoom, Power BI, Canva..." style={s_input()} />
+                </div>
+                <div style={COL}>
+                  <span style={LBL}>Partecipazione a reti professionali o associazioni <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
+                  <input type="text" value={reti} onChange={e => setReti(e.target.value)} maxLength={200} placeholder="Es. AIF, AIDP, AIFOS, Federmanager..." style={s_input()} />
+                </div>
               </div>
             </SectionCard>
           </>
@@ -771,15 +849,6 @@ export function RevampStep3CompetenzePage() {
           </SectionCard>
         )}
 
-        {/* ── Error summary ── */}
-        {errorCount > 0 && (
-          <div style={{ background: WARN_BG, border: `1px solid ${WARN_BORDER}`, borderRadius: 6, padding: "12px 16px" }}>
-            <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#92400e" }}>
-              ⚠ {mainErrors > 0 ? `${mainErrors} ${mainErrors === 1 ? "campo richiede" : "campi richiedono"} attenzione` : ""}
-              {areaErrors > 0 ? `${mainErrors > 0 ? "; " : ""}${areaErrors} ${areaErrors === 1 ? "campo non completato nelle aree tematiche" : "campi non completati nelle aree tematiche"}` : ""}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Bottom nav ── */}

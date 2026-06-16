@@ -403,9 +403,9 @@ public class RevampApplicationService {
     private static Set<String> allowedRootFieldsForFcrGroup(String fcrGroupKey) {
         return switch (fcrGroupKey) {
             case "foto_profilo" -> Set.of("profilePhotoAttachment", "idDocumentExpiry");
-            case "dati_personali" -> Set.of("fullName", "birthDate", "birthPlace");
-            case "dati_fiscali" -> Set.of("taxCode", "vatNumber", "taxRegime", "taxRegimeOther");
-            case "indirizzo" -> Set.of("country", "address", "addressLine", "streetNumber", "city", "province", "stato", "region", "postalCode");
+            case "dati_personali" -> Set.of("fullName", "birthDate", "birthPlace", "birthProvince");
+            case "dati_fiscali" -> Set.of("taxCode", "vatNumber", "taxRegime", "taxRegimeOther", "cassa");
+            case "indirizzo" -> Set.of("country", "address", "addressLine", "streetNumber", "city", "province", "postalCode");
             case "contatti" -> Set.of("phone", "secondaryPhone", "phoneCode", "phoneSecondary", "phoneSecondaryCode", "email", "secondaryEmail", "emailSecondary", "pec", "website", "linkedin");
             case "dati_aziendali" -> Set.of("companyName", "legalForm");
             case "identificativi" -> Set.of("vatNumber", "taxCodeIfDifferent", "reaNumber", "cciaaProvince", "incorporationDate");

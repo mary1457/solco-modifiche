@@ -570,7 +570,6 @@ export function RevampAlboBStep4CertificazioniPage() {
   }
 
   const errors = { ...manualErrors, ...(triedSubmit ? validate() : {}) };
-  const errorCount = Object.keys(errors).length;
 
   return (
     <div style={{ margin: "-1rem", background: "#f0f4f8", minHeight: "100%" }}>
@@ -782,12 +781,6 @@ export function RevampAlboBStep4CertificazioniPage() {
             </div>
           </div>
 
-          {/* Error summary */}
-          {errorCount > 0 ? (
-            <div style={{ background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 6, padding: "12px 16px", marginTop: 20 }}>
-              <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#b91c1c" }}>⚠ {errorCount} {errorCount === 1 ? "campo richiede attenzione" : "campi richiedono attenzione"}</div>
-            </div>
-          ) : null}
         </div>
       </div>
 

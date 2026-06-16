@@ -15,9 +15,12 @@ import { useI18n } from "../../i18n/I18nContext";
 import { saveRevampApplicationSession } from "../../utils/revampApplicationSession";
 import { useFcrEditMode } from "../../hooks/useFcrEditMode";
 import { FcrSubmitBar } from "../../components/supplier/FcrSubmitBar";
+import { validateCFCheckDigit, validateCFBirthDate } from "../../utils/codiceFiscale";
+import { PROVINCE_IT } from "../../utils/provinces";
 
 const CF_RE   = /^[A-Z]{6}\d{2}[A-EHLMPR-T]\d{2}[A-Z]\d{3}[A-Z]$/i;
 const PIVA_RE = /^IT\d{11}$/i;
+const BIRTH_PROVINCE_CODES = "AG AL AN AO AQ AR AP AT AV BA BT BL BN BG BI BO BZ BS BR CA CL CB CE CT CZ CH CO CS CR KR CN EN FM FE FI FG FC FR GE GO GR IM IS SP LT LE LC LI LO LU MC MN MS MT ME MI MO MB NA NO NU OR PD PA PR PV PG PU PE PC PI PT PN PZ PO RG RA RC RE RI RN RM RO SA SS SV SI SR SO SU TA TE TR TO TP TN TV TS UD VA VE VB VC VR VV VI VT".split(" ");
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
@@ -25,9 +28,11 @@ type AlboASection1 = {
   fullName: string;
   birthDate: string;
   birthPlace: string;
+  birthProvince: string;
   taxCode: string;
   vatNumber: string;
   taxRegime: string;
+  cassa: string;
   addressLine: string;
   streetNumber: string;
   phone: string;
@@ -39,8 +44,6 @@ type AlboASection1 = {
   linkedin: string;
   city: string;
   province: string;
-  stato: string;
-  region: string;
   postalCode: string;
   profilePhotoAttachment?: {
     documentType: "OTHER";
@@ -95,9 +98,11 @@ const emptyA: AlboASection1 = {
   fullName: "",
   birthDate: "",
   birthPlace: "",
+  birthProvince: "",
   taxCode: "",
   vatNumber: "",
   taxRegime: "",
+  cassa: "",
   addressLine: "",
   streetNumber: "",
   phone: "",
@@ -109,8 +114,6 @@ const emptyA: AlboASection1 = {
   linkedin: "",
   city: "",
   province: "",
-  stato: "",
-  region: "",
   postalCode: "",
   profilePhotoAttachment: undefined
 };
@@ -241,9 +244,11 @@ export function RevampApplicationStep1Page() {
               fullName: parsed.fullName ?? "",
               birthDate: parsed.birthDate ?? "",
               birthPlace: parsed.birthPlace ?? "",
+              birthProvince: parsed.birthProvince ?? "",
               taxCode: parsed.taxCode ?? "",
               vatNumber: parsed.vatNumber ?? "",
               taxRegime: parsed.taxRegime ?? "",
+              cassa: (parsed as any).cassa === true || (parsed as any).cassa === "si" ? "si" : (parsed as any).cassa === false || (parsed as any).cassa === "no" ? "no" : "",
               addressLine: parsed.addressLine ?? "",
               streetNumber: parsed.streetNumber ?? "",
               phone: parsed.phone ?? "",
@@ -255,8 +260,6 @@ export function RevampApplicationStep1Page() {
               linkedin: parsed.linkedin ?? "",
               city: parsed.city ?? "",
               province: parsed.province ?? "",
-              stato: parsed.stato ?? "",
-              region: parsed.region ?? "",
               postalCode: parsed.postalCode ?? "",
               profilePhotoAttachment: parsed.profilePhotoAttachment && parsed.profilePhotoAttachment.fileName && parsed.profilePhotoAttachment.storageKey
                 ? {
@@ -497,16 +500,18 @@ export function RevampApplicationStep1Page() {
       if (!alboA.fullName.trim()) next.fullName = t("revamp.step1.error.fullNameRequired");
       if (!alboA.birthDate.trim()) next.birthDate = t("revamp.step1.error.birthDateRequired");
       if (!alboA.birthPlace.trim()) next.birthPlace = t("revamp.step1.error.birthPlaceRequired");
+      if (!alboA.birthProvince.trim()) next.birthProvince = t("revamp.step1.error.birthProvinceRequired");
       if (!alboA.taxCode.trim()) next.taxCode = t("revamp.step1.error.taxCodeRequired");
       else if (!CF_RE.test(alboA.taxCode.trim())) next.taxCode = "Formato non valido (es. RSSMRA80C15F205X).";
+      else if (!validateCFCheckDigit(alboA.taxCode.trim())) next.taxCode = "Carattere di controllo errato. Verifica di aver inserito il codice correttamente.";
+      else if (alboA.birthDate.trim() && !validateCFBirthDate(alboA.taxCode.trim(), alboA.birthDate.trim())) next.taxCode = "Il codice fiscale non corrisponde alla data di nascita inserita.";
+      if (!alboA.cassa) next.cassa = "Campo obbligatorio.";
       if (!alboA.addressLine.trim()) next.addressLine = t("revamp.step1.error.addressLineRequired");
       if (!alboA.streetNumber.trim()) next.streetNumber = t("revamp.step1.error.streetNumberRequired");
       if (!alboA.phone.trim()) next.phone = t("revamp.step1.error.phoneRequired");
       if (!alboA.email.trim()) next.email = t("revamp.step1.error.emailRequired");
       if (!alboA.city.trim()) next.city = t("revamp.step1.error.cityRequired");
       if (!alboA.province.trim()) next.province = t("revamp.step1.error.provinceRequired");
-      if (!alboA.stato.trim()) next.stato = "Stato obbligatorio.";
-      if (!alboA.region.trim()) next.region = "Regione obbligatoria.";
       if (!alboA.postalCode.trim()) next.postalCode = t("revamp.step1.error.postalCodeRequired");
       return next;
     }
@@ -727,6 +732,20 @@ export function RevampApplicationStep1Page() {
                 />
                 <span className="floating-field-label">{t("revamp.step1.field.birthPlace")}</span>
               </label>
+              <label className={`floating-field ${alboA.birthProvince ? "has-value" : ""}`}>
+                <select
+                  className="floating-input auth-input"
+                  value={alboA.birthProvince}
+                  onChange={(e) => {
+                    setAlboA((prev) => ({ ...prev, birthProvince: e.target.value }));
+                    markDirty();
+                  }}
+                >
+                  <option value=""></option>
+                  {BIRTH_PROVINCE_CODES.map(code => <option key={code} value={code}>{code}</option>)}
+                </select>
+                <span className="floating-field-label">{t("revamp.step1.field.birthProvince")}</span>
+              </label>
             </div>
             </fieldset>
 
@@ -747,6 +766,10 @@ export function RevampApplicationStep1Page() {
                       if (!v) return;
                       if (!CF_RE.test(v)) {
                         setErrors(prev => ({ ...prev, taxCode: "Formato non valido (es. RSSMRA80C15F205X)." }));
+                      } else if (!validateCFCheckDigit(v)) {
+                        setErrors(prev => ({ ...prev, taxCode: "Carattere di controllo errato. Verifica di aver inserito il codice correttamente." }));
+                      } else if (alboA.birthDate.trim() && !validateCFBirthDate(v, alboA.birthDate.trim())) {
+                        setErrors(prev => ({ ...prev, taxCode: "Il codice fiscale non corrisponde alla data di nascita inserita." }));
                       } else {
                         setErrors(prev => { const n = { ...prev }; delete n.taxCode; return n; });
                       }
@@ -777,9 +800,21 @@ export function RevampApplicationStep1Page() {
                   <input className="floating-input auth-input" value={alboA.taxRegime} onChange={(e) => { setAlboA((prev) => ({ ...prev, taxRegime: e.target.value })); markDirty(); }} placeholder=" " />
                   <span className="floating-field-label">{t("revamp.step1.field.taxRegimeOptional")}</span>
                 </label>
+                <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "6px 0" }}>
+                  <span style={{ fontSize: 13, color: "#374151" }}>{t("revamp.step1.field.cassa")}</span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
+                    <input type="radio" value="si" checked={alboA.cassa === "si"} onChange={() => { setAlboA((prev) => ({ ...prev, cassa: "si" })); markDirty(); }} />
+                    Sì
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
+                    <input type="radio" value="no" checked={alboA.cassa === "no"} onChange={() => { setAlboA((prev) => ({ ...prev, cassa: "no" })); markDirty(); }} />
+                    No
+                  </label>
+                </div>
               </div>
               {errors.taxCode ? <p className="error">{errors.taxCode}</p> : null}
               {errors.vatNumber ? <p className="error">{errors.vatNumber}</p> : null}
+              {errors.cassa ? <p className="error">{errors.cassa}</p> : null}
             </fieldset>
 
             {/* ── indirizzo ── */}
@@ -801,17 +836,12 @@ export function RevampApplicationStep1Page() {
                   <input className="floating-input auth-input" value={alboA.city} onChange={(e) => { setAlboA((prev) => ({ ...prev, city: e.target.value })); markDirty(); }} placeholder=" " />
                   <span className="floating-field-label">{t("revamp.step1.field.city")}</span>
                 </label>
-                <label className={`floating-field ${alboA.province ? "has-value" : ""}`}>
-                  <input className="floating-input auth-input" value={alboA.province} onChange={(e) => { setAlboA((prev) => ({ ...prev, province: e.target.value })); markDirty(); }} placeholder=" " />
+                <label className={`floating-field has-value`}>
+                  <select className="floating-input auth-input" value={alboA.province} onChange={(e) => { setAlboA((prev) => ({ ...prev, province: e.target.value })); markDirty(); }}>
+                    <option value="">—</option>
+                    {PROVINCE_IT.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
                   <span className="floating-field-label">{t("revamp.step1.field.province")}</span>
-                </label>
-                <label className={`floating-field ${alboA.stato ? "has-value" : ""}`}>
-                  <input className="floating-input auth-input" value={alboA.stato} onChange={(e) => { setAlboA((prev) => ({ ...prev, stato: e.target.value })); markDirty(); }} placeholder=" " />
-                  <span className="floating-field-label">{t("revamp.step1.field.stato")}</span>
-                </label>
-                <label className={`floating-field ${alboA.region ? "has-value" : ""}`}>
-                  <input className="floating-input auth-input" value={alboA.region} onChange={(e) => { setAlboA((prev) => ({ ...prev, region: e.target.value })); markDirty(); }} placeholder=" " />
-                  <span className="floating-field-label">{t("revamp.step1.field.region")}</span>
                 </label>
                 <label className={`floating-field ${alboA.postalCode ? "has-value" : ""}`}>
                   <input className="floating-input auth-input" value={alboA.postalCode} onChange={(e) => { setAlboA((prev) => ({ ...prev, postalCode: e.target.value })); markDirty(); }} placeholder=" " />
@@ -822,8 +852,6 @@ export function RevampApplicationStep1Page() {
               {errors.streetNumber ? <p className="error">{errors.streetNumber}</p> : null}
               {errors.city ? <p className="error">{errors.city}</p> : null}
               {errors.province ? <p className="error">{errors.province}</p> : null}
-              {errors.stato ? <p className="error">{errors.stato}</p> : null}
-              {errors.region ? <p className="error">{errors.region}</p> : null}
               {errors.postalCode ? <p className="error">{errors.postalCode}</p> : null}
             </fieldset>
 
@@ -870,6 +898,7 @@ export function RevampApplicationStep1Page() {
             {errors.fullName ? <p className="error">{errors.fullName}</p> : null}
             {errors.birthDate ? <p className="error">{errors.birthDate}</p> : null}
             {errors.birthPlace ? <p className="error">{errors.birthPlace}</p> : null}
+            {errors.birthProvince ? <p className="error">{errors.birthProvince}</p> : null}
           </>
         ) : (
           <>

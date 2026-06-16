@@ -13,6 +13,9 @@ import { FcrSubmitBar } from "../../components/supplier/FcrSubmitBar";
 import { clearRevampIntegrationEditSession, integrationEditHasAnyCode, isRevampIntegrationEditFor } from "../../utils/revampIntegrationEditSession";
 import { completeRevampIntegrationEdit } from "../../utils/revampIntegrationCompletion";
 import { clearRevampDocumentRenewalEditSession, isRevampDocumentRenewalEditFor, requestRevampDocumentRenewalDrawerReopen } from "../../utils/revampDocumentRenewalEditSession";
+import { validateCFCheckDigit, validateCFBirthDate } from "../../utils/codiceFiscale";
+import { PROVINCE_IT } from "../../utils/provinces";
+import { COUNTRIES_IT } from "../../utils/countries";
 
 type RegistryType = "ALBO_A" | "ALBO_B";
 
@@ -40,85 +43,7 @@ const REGIMI_FISCALI = [
   { value: "altro",       label: "Altro (specificare)" },
 ];
 
-const PROVINCE_IT = [
-  { value: "AG", label: "Agrigento (AG)" }, { value: "AL", label: "Alessandria (AL)" },
-  { value: "AN", label: "Ancona (AN)" }, { value: "AO", label: "Aosta (AO)" },
-  { value: "AQ", label: "L'Aquila (AQ)" }, { value: "AR", label: "Arezzo (AR)" },
-  { value: "AP", label: "Ascoli Piceno (AP)" }, { value: "AT", label: "Asti (AT)" },
-  { value: "AV", label: "Avellino (AV)" }, { value: "BA", label: "Bari (BA)" },
-  { value: "BT", label: "Barletta-Andria-Trani (BT)" }, { value: "BL", label: "Belluno (BL)" },
-  { value: "BN", label: "Benevento (BN)" }, { value: "BG", label: "Bergamo (BG)" },
-  { value: "BI", label: "Biella (BI)" }, { value: "BO", label: "Bologna (BO)" },
-  { value: "BZ", label: "Bolzano (BZ)" }, { value: "BS", label: "Brescia (BS)" },
-  { value: "BR", label: "Brindisi (BR)" }, { value: "CA", label: "Cagliari (CA)" },
-  { value: "CL", label: "Caltanissetta (CL)" }, { value: "CB", label: "Campobasso (CB)" },
-  { value: "CE", label: "Caserta (CE)" }, { value: "CT", label: "Catania (CT)" },
-  { value: "CZ", label: "Catanzaro (CZ)" }, { value: "CH", label: "Chieti (CH)" },
-  { value: "CO", label: "Como (CO)" }, { value: "CS", label: "Cosenza (CS)" },
-  { value: "CR", label: "Cremona (CR)" }, { value: "KR", label: "Crotone (KR)" },
-  { value: "CN", label: "Cuneo (CN)" }, { value: "EN", label: "Enna (EN)" },
-  { value: "FM", label: "Fermo (FM)" }, { value: "FE", label: "Ferrara (FE)" },
-  { value: "FI", label: "Firenze (FI)" }, { value: "FG", label: "Foggia (FG)" },
-  { value: "FC", label: "Forlì-Cesena (FC)" }, { value: "FR", label: "Frosinone (FR)" },
-  { value: "GE", label: "Genova (GE)" }, { value: "GO", label: "Gorizia (GO)" },
-  { value: "GR", label: "Grosseto (GR)" }, { value: "IM", label: "Imperia (IM)" },
-  { value: "IS", label: "Isernia (IS)" }, { value: "SP", label: "La Spezia (SP)" },
-  { value: "LT", label: "Latina (LT)" }, { value: "LE", label: "Lecce (LE)" },
-  { value: "LC", label: "Lecco (LC)" }, { value: "LI", label: "Livorno (LI)" },
-  { value: "LO", label: "Lodi (LO)" }, { value: "LU", label: "Lucca (LU)" },
-  { value: "MC", label: "Macerata (MC)" }, { value: "MN", label: "Mantova (MN)" },
-  { value: "MS", label: "Massa-Carrara (MS)" }, { value: "MT", label: "Matera (MT)" },
-  { value: "ME", label: "Messina (ME)" }, { value: "MI", label: "Milano (MI)" },
-  { value: "MO", label: "Modena (MO)" }, { value: "MB", label: "Monza e Brianza (MB)" },
-  { value: "NA", label: "Napoli (NA)" }, { value: "NO", label: "Novara (NO)" },
-  { value: "NU", label: "Nuoro (NU)" }, { value: "OR", label: "Oristano (OR)" },
-  { value: "PD", label: "Padova (PD)" }, { value: "PA", label: "Palermo (PA)" },
-  { value: "PR", label: "Parma (PR)" }, { value: "PV", label: "Pavia (PV)" },
-  { value: "PG", label: "Perugia (PG)" }, { value: "PU", label: "Pesaro e Urbino (PU)" },
-  { value: "PE", label: "Pescara (PE)" }, { value: "PC", label: "Piacenza (PC)" },
-  { value: "PI", label: "Pisa (PI)" }, { value: "PT", label: "Pistoia (PT)" },
-  { value: "PN", label: "Pordenone (PN)" }, { value: "PZ", label: "Potenza (PZ)" },
-  { value: "PO", label: "Prato (PO)" }, { value: "RG", label: "Ragusa (RG)" },
-  { value: "RA", label: "Ravenna (RA)" }, { value: "RC", label: "Reggio Calabria (RC)" },
-  { value: "RE", label: "Reggio Emilia (RE)" }, { value: "RI", label: "Rieti (RI)" },
-  { value: "RN", label: "Rimini (RN)" }, { value: "RM", label: "Roma (RM)" },
-  { value: "RO", label: "Rovigo (RO)" }, { value: "SA", label: "Salerno (SA)" },
-  { value: "SS", label: "Sassari (SS)" }, { value: "SV", label: "Savona (SV)" },
-  { value: "SI", label: "Siena (SI)" }, { value: "SR", label: "Siracusa (SR)" },
-  { value: "SO", label: "Sondrio (SO)" }, { value: "SU", label: "Sud Sardegna (SU)" },
-  { value: "TA", label: "Taranto (TA)" }, { value: "TE", label: "Teramo (TE)" },
-  { value: "TR", label: "Terni (TR)" }, { value: "TO", label: "Torino (TO)" },
-  { value: "TP", label: "Trapani (TP)" }, { value: "TN", label: "Trento (TN)" },
-  { value: "TV", label: "Treviso (TV)" }, { value: "TS", label: "Trieste (TS)" },
-  { value: "UD", label: "Udine (UD)" }, { value: "VA", label: "Varese (VA)" },
-  { value: "VE", label: "Venezia (VE)" }, { value: "VB", label: "Verbano-Cusio-Ossola (VB)" },
-  { value: "VC", label: "Vercelli (VC)" }, { value: "VR", label: "Verona (VR)" },
-  { value: "VV", label: "Vibo Valentia (VV)" }, { value: "VI", label: "Vicenza (VI)" },
-  { value: "VT", label: "Viterbo (VT)" },
-];
 
-const REGIONI_IT = [
-  { value: "Abruzzo", label: "Abruzzo" },
-  { value: "Basilicata", label: "Basilicata" },
-  { value: "Calabria", label: "Calabria" },
-  { value: "Campania", label: "Campania" },
-  { value: "Emilia-Romagna", label: "Emilia-Romagna" },
-  { value: "Friuli-Venezia Giulia", label: "Friuli-Venezia Giulia" },
-  { value: "Lazio", label: "Lazio" },
-  { value: "Liguria", label: "Liguria" },
-  { value: "Lombardia", label: "Lombardia" },
-  { value: "Marche", label: "Marche" },
-  { value: "Molise", label: "Molise" },
-  { value: "Piemonte", label: "Piemonte" },
-  { value: "Puglia", label: "Puglia" },
-  { value: "Sardegna", label: "Sardegna" },
-  { value: "Sicilia", label: "Sicilia" },
-  { value: "Toscana", label: "Toscana" },
-  { value: "Trentino-Alto Adige", label: "Trentino-Alto Adige" },
-  { value: "Umbria", label: "Umbria" },
-  { value: "Valle d'Aosta", label: "Valle d'Aosta" },
-  { value: "Veneto", label: "Veneto" },
-];
 
 /* Regimes where PIVA is mandatory */
 const PIVA_REQUIRED_REGIMES = new Set(["ordinario", "forfettario", "ditta"]);
@@ -226,10 +151,11 @@ function UploadFieldLabel({ label, hint }: { label: string; hint: string }) {
 
 /* ─── Field components ─────────────────────────────── */
 function Field({
-  label, required, placeholder, value, onChange, onBlur, error, type = "text", hintText, tooltip, errorTooltip, disabled
+  label, required, placeholder, value, onChange, onBlur, error, type = "text", hintText, tooltip, errorTooltip, disabled, options
 }: {
   label: string; required?: boolean; placeholder?: string;
   value?: string; onChange?: OnChange; onBlur?: () => void; error?: string; type?: string; hintText?: string; tooltip?: string; errorTooltip?: boolean; disabled?: boolean;
+  options?: { value: string; label: string }[];
 }) {
   const [showTip, setShowTip] = useState(false);
   const [showErrorTip, setShowErrorTip] = useState(false);
@@ -278,15 +204,28 @@ function Field({
           </span>
         ) : null}
       </span>
-      <input
-        type={type}
-        placeholder={placeholder ?? ""}
-        value={value ?? ""}
-        onChange={onChange}
-        onBlur={onBlur}
-        disabled={disabled}
-        style={{ ...baseInput(!!error), ...(disabled ? { background: "#f3f4f6", cursor: "not-allowed", color: "#6b7280" } : {}) }}
-      />
+      {options ? (
+        <select
+          value={value ?? ""}
+          onChange={onChange}
+          onBlur={onBlur}
+          disabled={disabled}
+          style={{ ...baseInput(!!error), ...(disabled ? { background: "#f3f4f6", cursor: "not-allowed", color: "#6b7280" } : {}) }}
+        >
+          <option value="">{placeholder ?? "Seleziona"}</option>
+          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      ) : (
+        <input
+          type={type}
+          placeholder={placeholder ?? ""}
+          value={value ?? ""}
+          onChange={onChange}
+          onBlur={onBlur}
+          disabled={disabled}
+          style={{ ...baseInput(!!error), ...(disabled ? { background: "#f3f4f6", cursor: "not-allowed", color: "#6b7280" } : {}) }}
+        />
+      )}
       {error && !errorTooltip ? <span style={errTxt}>{error}</span> : null}
     </div>
   );
@@ -446,9 +385,9 @@ export function RevampRegistryStartPage() {
   const integrationIdentityOnly = integrationEditHasAnyCode(integrationEdit, ["ID_DOCUMENT"]) || Boolean(renewalEdit?.documentType === "ID_DOCUMENT");
 
   const [form, setForm] = useState({
-    fullName: "", birthDate: "", birthPlace: "",
-    taxCode: "", vatNumber: "", taxRegime: "", taxRegimeOther: "",
-    country: "Italia", address: "", streetNumber: "", city: "", postalCode: "", province: "", stato: "", region: "",
+    fullName: "", birthDate: "", birthPlace: "", birthProvince: "",
+    taxCode: "", vatNumber: "", taxRegime: "", taxRegimeOther: "", cassa: "",
+    country: "IT", address: "", streetNumber: "", city: "", postalCode: "", province: "",
     phoneCode: "+39", phone: "", phoneSecondaryCode: "+39", phoneSecondary: "",
     email: auth?.email ?? "", emailSecondary: "", pec: "",
     website: "", linkedin: "",
@@ -531,17 +470,17 @@ export function RevampRegistryStartPage() {
         fullName:       (s1.fullName       as string) ?? prev.fullName,
         birthDate:      (s1.birthDate      as string) ?? prev.birthDate,
         birthPlace:     (s1.birthPlace     as string) ?? prev.birthPlace,
+        birthProvince:  (s1.birthProvince  as string) ?? prev.birthProvince,
         taxCode:        (s1.taxCode        as string) ?? prev.taxCode,
         vatNumber:      (s1.vatNumber      as string) ?? prev.vatNumber,
         taxRegime:      (s1.taxRegime      as string) ?? prev.taxRegime,
-        country:        (s1.country        as string) ?? prev.country,
+        cassa:          (s1.cassa === true || (s1.cassa as string) === "si") ? "si" : (s1.cassa === false || (s1.cassa as string) === "no") ? "no" : "" as string,
+        country:        ((s1.country === "Italia" ? "IT" : s1.country) as string) ?? prev.country,
         address:        ((s1.addressLine ?? s1.address) as string) ?? prev.address,
         streetNumber:   (s1.streetNumber as string) ?? prev.streetNumber,
         city:           (s1.city           as string) ?? prev.city,
         postalCode:     (s1.postalCode     as string) ?? prev.postalCode,
         province:       (s1.province       as string) ?? prev.province,
-        stato:          (s1.stato          as string) ?? prev.stato,
-        region:         (s1.region         as string) ?? prev.region,
         phoneCode:      primaryPhone.code,
         phone:          primaryPhone.number || prev.phone,
         phoneSecondaryCode: secondaryPhone.code,
@@ -741,11 +680,16 @@ export function RevampRegistryStartPage() {
     }
 
     if (!form.birthPlace.trim()) e.birthPlace = "Campo obbligatorio.";
+    if (!form.birthProvince) e.birthProvince = "Campo obbligatorio.";
 
     if (!form.taxCode.trim()) {
       e.taxCode = "Campo obbligatorio.";
     } else if (!CF_RE.test(form.taxCode.trim())) {
       e.taxCode = "Formato non valido (16 caratteri: AAABBB99A99A999A).";
+    } else if (!validateCFCheckDigit(form.taxCode.trim())) {
+      e.taxCode = "Carattere di controllo errato. Verifica di aver inserito il codice correttamente.";
+    } else if (form.birthDate.trim() && !validateCFBirthDate(form.taxCode.trim(), form.birthDate.trim())) {
+      e.taxCode = "Il codice fiscale non corrisponde alla data di nascita inserita.";
     }
 
     if (pivaReq && !form.vatNumber.trim()) {
@@ -755,6 +699,7 @@ export function RevampRegistryStartPage() {
     }
 
     if (!form.taxRegime)                                         e.taxRegime      = "Campo obbligatorio.";
+    if (!form.cassa)                                             e.cassa          = "Campo obbligatorio.";
     if (showOtherRegime && !form.taxRegimeOther.trim())          e.taxRegimeOther = "Specifica il regime fiscale.";
 
     if (!form.country.trim())    e.country   = "Campo obbligatorio.";
@@ -763,8 +708,6 @@ export function RevampRegistryStartPage() {
     if (!form.city.trim())       e.city      = "Campo obbligatorio.";
     if (!form.postalCode.trim()) e.postalCode = "Campo obbligatorio.";
     if (!form.province.trim())   e.province  = "Campo obbligatorio.";
-    if (!form.stato.trim())      e.stato     = "Campo obbligatorio.";
-    if (!form.region.trim())     e.region    = "Campo obbligatorio.";
     if (!form.phone.trim())      e.phone     = "Campo obbligatorio.";
 
     if (!form.email.trim()) {
@@ -800,12 +743,12 @@ export function RevampRegistryStartPage() {
       const appId = await getOrCreateApplicationId(isA ? "ALBO_A" : "ALBO_B");
       const payload = JSON.stringify({
         fullName: form.fullName,
-        birthDate: form.birthDate, birthPlace: form.birthPlace,
+        birthDate: form.birthDate, birthPlace: form.birthPlace, birthProvince: form.birthProvince,
         taxCode: form.taxCode, vatNumber: form.vatNumber,
-        taxRegime: form.taxRegime, email: form.email,
+        taxRegime: form.taxRegime, cassa: form.cassa, email: form.email,
         phone: composePhoneValue(form.phoneCode, form.phone), country: form.country, address: form.address, addressLine: form.address, streetNumber: form.streetNumber,
         city: form.city, postalCode: form.postalCode,
-        province: form.province, stato: form.stato, region: form.region, linkedin: form.linkedin,
+        province: form.province, linkedin: form.linkedin,
         secondaryPhone: composePhoneValue(form.phoneSecondaryCode, form.phoneSecondary),
         secondaryEmail: form.emailSecondary,
         pec: form.pec,
@@ -834,12 +777,12 @@ export function RevampRegistryStartPage() {
     const appId = await getOrCreateApplicationId(isA ? "ALBO_A" : "ALBO_B");
     await saveRevampApplicationSection(appId, "S1", JSON.stringify({
       fullName: form.fullName,
-      birthDate: form.birthDate, birthPlace: form.birthPlace,
+      birthDate: form.birthDate, birthPlace: form.birthPlace, birthProvince: form.birthProvince,
       taxCode: form.taxCode, vatNumber: form.vatNumber,
-      taxRegime: form.taxRegime, taxRegimeOther: form.taxRegimeOther, email: form.email,
+      taxRegime: form.taxRegime, taxRegimeOther: form.taxRegimeOther, cassa: form.cassa, email: form.email,
       phone: composePhoneValue(form.phoneCode, form.phone), country: form.country, address: form.address, addressLine: form.address, streetNumber: form.streetNumber,
       city: form.city, postalCode: form.postalCode,
-      province: form.province, stato: form.stato, region: form.region, linkedin: form.linkedin,
+      province: form.province, linkedin: form.linkedin,
       secondaryPhone: composePhoneValue(form.phoneSecondaryCode, form.phoneSecondary),
       secondaryEmail: form.emailSecondary,
       pec: form.pec,
@@ -858,12 +801,12 @@ export function RevampRegistryStartPage() {
     handleSave();
     sessionStorage.setItem("revamp_s1", JSON.stringify({
       fullName: form.fullName,
-      birthDate: form.birthDate, birthPlace: form.birthPlace,
+      birthDate: form.birthDate, birthPlace: form.birthPlace, birthProvince: form.birthProvince,
       taxCode: form.taxCode, vatNumber: form.vatNumber,
-      taxRegime: form.taxRegime, email: form.email,
+      taxRegime: form.taxRegime, cassa: form.cassa, email: form.email,
       phone: composePhoneValue(form.phoneCode, form.phone), country: form.country, address: form.address, addressLine: form.address, streetNumber: form.streetNumber,
       city: form.city, postalCode: form.postalCode,
-      province: form.province, stato: form.stato, region: form.region, linkedin: form.linkedin,
+      province: form.province, linkedin: form.linkedin,
       secondaryPhone: composePhoneValue(form.phoneSecondaryCode, form.phoneSecondary),
       secondaryEmail: form.emailSecondary,
       pec: form.pec,
@@ -1069,7 +1012,7 @@ export function RevampRegistryStartPage() {
             {/* ── Dati personali ── */}
             <fieldset disabled={integrationIdentityOnly} className={fcr.active ? (fcr.isLocked("dati_personali") ? "fcr-locked" : "fcr-active-group") : integrationIdentityOnly ? "fcr-locked" : undefined}>
             <SectionLabel label="Dati personali" accent={accent} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <Field label="Nome e Cognome" required value={form.fullName} onChange={set("fullName")} error={errors.fullName} placeholder="Mario Rossi" />
               <Field label="Data di nascita" required value={form.birthDate}
                 onChange={(e) => {
@@ -1094,7 +1037,10 @@ export function RevampRegistryStartPage() {
                   }
                 }}
               />
-              <Field label="Luogo di nascita" required value={form.birthPlace} onChange={set("birthPlace")} error={errors.birthPlace} placeholder="Milano (MI)" tooltip="Comune e Paese se estero" />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
+              <Field label="Luogo di nascita" required value={form.birthPlace} onChange={set("birthPlace")} error={errors.birthPlace} placeholder="es. Milano" />
+              <Field label="Provincia di nascita" required value={form.birthProvince} onChange={set("birthProvince")} error={errors.birthProvince} options={PROVINCE_IT.map(p => ({ value: p.value, label: p.value }))} placeholder="Seleziona" />
             </div>
             </fieldset>
 
@@ -1119,6 +1065,10 @@ export function RevampRegistryStartPage() {
                   if (!v) return;
                   if (!CF_RE.test(v)) {
                     setErrors(prev => ({ ...prev, taxCode: "Formato non valido (es. RSSMRA80C15F205X)." }));
+                  } else if (!validateCFCheckDigit(v)) {
+                    setErrors(prev => ({ ...prev, taxCode: "Carattere di controllo errato. Verifica di aver inserito il codice correttamente." }));
+                  } else if (form.birthDate.trim() && !validateCFBirthDate(v, form.birthDate.trim())) {
+                    setErrors(prev => ({ ...prev, taxCode: "Il codice fiscale non corrisponde alla data di nascita inserita." }));
                   } else {
                     setErrors(prev => { const n = { ...prev }; delete n.taxCode; return n; });
                   }
@@ -1154,7 +1104,7 @@ export function RevampRegistryStartPage() {
               />
             </div>
             {showOtherRegime ? (
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 12 }}>
                 <Field
                   label="Specifica il regime fiscale" required
                   value={form.taxRegimeOther} onChange={set("taxRegimeOther")} error={errors.taxRegimeOther}
@@ -1162,24 +1112,32 @@ export function RevampRegistryStartPage() {
                 />
               </div>
             ) : null}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: "#374151" }}>Cassa <span style={{ color: "#e53e3e" }}>*</span></span>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+                <input type="radio" value="si" checked={form.cassa === "si"} onChange={() => setForm(prev => ({ ...prev, cassa: "si" }))} />
+                Sì
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
+                <input type="radio" value="no" checked={form.cassa === "no"} onChange={() => setForm(prev => ({ ...prev, cassa: "no" }))} />
+                No
+              </label>
+              {errors.cassa && <span style={{ color: "#e53e3e", fontSize: 12 }}>{errors.cassa}</span>}
+            </div>
             </fieldset>
 
             {/* ── Indirizzo ── */}
             <fieldset disabled={integrationIdentityOnly} className={fcr.active ? (fcr.isLocked("indirizzo") ? "fcr-locked" : "fcr-active-group") : integrationIdentityOnly ? "fcr-locked" : undefined}>
             <SectionLabel label="Indirizzo professionale / di residenza" accent={accent} />
-            <div style={{ display: "grid", gridTemplateColumns: "0.9fr 2fr 0.8fr", gap: 16, marginBottom: 12 }}>
-              <Field label="Paese" required value={form.country} onChange={set("country")} error={errors.country} placeholder="Italia" />
-              <Field label="Indirizzo" required value={form.address} onChange={set("address")} error={errors.address} placeholder="Via Dante" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 0.8fr", gap: 16, marginBottom: 12 }}>
+              <SelectField label="Paese" required value={form.country} onChange={set("country")} error={errors.country} options={COUNTRIES_IT} />
+              <Field label="Via" required value={form.address} onChange={set("address")} error={errors.address} placeholder="Via Dante" />
               <Field label="Numero civico" required value={form.streetNumber} onChange={set("streetNumber")} error={errors.streetNumber} placeholder="14/A" />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.8fr", gap: 16, marginBottom: 12 }}>
-              <Field label="Citta / Comune" required value={form.city} onChange={set("city")} error={errors.city} placeholder="Milano" />
-              <Field label="Codice postale" required value={form.postalCode} onChange={set("postalCode")} error={errors.postalCode} placeholder="20121" />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr 0.8fr", gap: 16, marginBottom: 16 }}>
+              <Field label="Città" required value={form.city} onChange={set("city")} error={errors.city} placeholder="Milano" />
               <SelectField label="Provincia" required value={form.province} onChange={set("province")} error={errors.province} options={PROVINCE_IT} />
-              <Field label="Stato" required value={form.stato} onChange={set("stato")} error={errors.stato} placeholder="Italia" />
-              <SelectField label="Regione" required value={form.region} onChange={set("region")} error={errors.region} options={REGIONI_IT} />
+              <Field label="CAP" required value={form.postalCode} onChange={set("postalCode")} error={errors.postalCode} placeholder="20121" />
             </div>
             </fieldset>
 

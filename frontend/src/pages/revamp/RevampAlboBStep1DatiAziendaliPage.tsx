@@ -16,8 +16,6 @@ import { FcrSubmitBar } from "../../components/supplier/FcrSubmitBar";
 const GREEN = "#1a5c3a";
 const MUTED = "#6b7280";
 const ERR = "#dc2626";
-const WARN_BG = "#fffbeb";
-const WARN_BORDER = "#f59e0b";
 
 const STEPS_B = ["Dati aziendali", "Struttura", "Servizi", "Certificazioni", "Dichiarazioni"];
 
@@ -764,10 +762,6 @@ export function RevampAlboBStep1DatiAziendaliPage() {
     navigate("/apply/albo-b/step/2");
   }
 
-  const summaryErrors = Object.fromEntries(
-    Object.entries(errors).filter(([field, message]) => !(field === "piva" && message === DUPLICATE_PIVA_ERROR))
-  );
-  const errorCount = Object.keys(summaryErrors).length;
 
   return (
     <div style={{ margin: "-1rem", background: "#f0f4f8", minHeight: "100%" }}>
@@ -938,14 +932,6 @@ export function RevampAlboBStep1DatiAziendaliPage() {
             </div>
             </fieldset>
 
-            {/* Error summary */}
-            {errorCount > 0 ? (
-              <div style={{ background: WARN_BG, border: `1px solid ${WARN_BORDER}`, borderRadius: 6, padding: "12px 16px" }}>
-                <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#92400e", marginBottom: 6 }}>
-                  ⚠ {errorCount} {errorCount === 1 ? "campo richiede attenzione" : "campi richiedono attenzione"}
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
 

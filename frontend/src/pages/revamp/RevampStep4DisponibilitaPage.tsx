@@ -17,21 +17,29 @@ const NAVY  = "#0f2a52";
 const GREEN = "#1a5c3a";
 const MUTED = "#6b7280";
 const ERR   = "#dc2626";
-const WARN_BG     = "#fffbeb";
-const WARN_BORDER = "#f59e0b";
 
 const STEPS = ["Anagrafica", "Tipologia", "Competenze", "Disponibilità", "Dichiarazioni"];
 
-/* ─── 3A options ─────────────────────────────────── */
-const TIPO_INTERVENTO = [
-  { value: "aula",      label: "Corso in aula" },
-  { value: "fad",       label: "FAD / E-learning" },
-  { value: "blended",   label: "Blended" },
-  { value: "coaching",  label: "Coaching" },
-  { value: "workshop",  label: "Workshop / Laboratorio" },
-  { value: "altro",     label: "Altro" },
-];
+function fmtMonthYear(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 6);
+  if (digits.length <= 2) return digits;
+  return digits.slice(0, 2) + "/" + digits.slice(2);
+}
+function isValidMonthYear(v: string): boolean {
+  if (!/^\d{2}\/\d{4}$/.test(v)) return false;
+  const mm = parseInt(v.slice(0, 2), 10);
+  return mm >= 1 && mm <= 12;
+}
+function monthYearToNum(v: string): number {
+  const [mm, yyyy] = v.split("/");
+  return parseInt(yyyy, 10) * 12 + parseInt(mm, 10);
+}
+function isToBeforeFrom(from: string, to: string): boolean {
+  if (!isValidMonthYear(from) || !isValidMonthYear(to)) return false;
+  return monthYearToNum(to) < monthYearToNum(from);
+}
 
+/* ─── 3A options ─────────────────────────────────── */
 const MODALITA_EROGAZIONE = [
   { value: "presenza",  label: "In presenza" },
   { value: "online_s",  label: "Online sincrona" },
@@ -52,20 +60,18 @@ const SETTORI_COMMITTENTE = [
 /* ─── types ──────────────────────────────────────── */
 type Esperienza = {
   committente: string; settore: string;
-  tipoIntervento: string; tipoIntTesto: string;
+  tipoIntTesto: string;
   ambitoTematico: string;
   periodoFrom: string; periodoTo: string;
-  durata: string; nPartecipanti: string;
+  durata: string;
   modalita: string;
   finanziata: string; fondoProgramma: string;
 };
 
-type Referenza = { nome: string; ruolo: string; contatto: string };
 
 function mkEsp(): Esperienza {
-  return { committente: "", settore: "", tipoIntervento: "", tipoIntTesto: "", ambitoTematico: "", periodoFrom: "", periodoTo: "", durata: "", nPartecipanti: "", modalita: "", finanziata: "", fondoProgramma: "" };
+  return { committente: "", settore: "", tipoIntTesto: "", ambitoTematico: "", periodoFrom: "", periodoTo: "", durata: "", modalita: "", finanziata: "", fondoProgramma: "" };
 }
-function mkRef(): Referenza { return { nome: "", ruolo: "", contatto: "" }; }
 
 /* ─── shared ui ──────────────────────────────────── */
 type OC  = (e: ChangeEvent<HTMLInputElement>)    => void;
@@ -85,14 +91,14 @@ const LBL: React.CSSProperties  = { fontSize: "0.77rem", fontWeight: 600, color:
 const HINT: React.CSSProperties = { fontWeight: 400, color: MUTED };
 const ERRTXT: React.CSSProperties = { fontSize: "0.73rem", color: ERR };
 
-function Field({ label, required, value, onChange, error, placeholder, type = "text", hint }: {
-  label: string; required?: boolean; value: string; onChange: OC;
+function Field({ label, required, value, onChange, onBlur, error, placeholder, type = "text", hint }: {
+  label: string; required?: boolean; value: string; onChange: OC; onBlur?: () => void;
   error?: string; placeholder?: string; type?: string; hint?: string;
 }) {
   return (
     <div style={COL}>
       <span style={LBL}>{label}{required && <span style={{ color: ERR }}> *</span>}{hint && <span style={HINT}> — {hint}</span>}</span>
-      <input type={type} placeholder={placeholder ?? ""} value={value} onChange={onChange} style={s_in(!!error)} />
+      <input type={type} placeholder={placeholder ?? ""} value={value} onChange={onChange} onBlur={onBlur} style={s_in(!!error)} />
       {error && <span style={ERRTXT}>{error}</span>}
     </div>
   );
@@ -132,9 +138,7 @@ function SectionCard({ title, desc, accent, badge, children }: { title: string; 
     ? ["cap_operativa", "tariffe", "territorio"]
     : title.includes("Esperienze")
       ? ["esperienze"]
-      : title.includes("Referenze")
-        ? ["referenze"]
-        : title.includes("Allegati") || title.includes("Curriculum")
+      : title.includes("Allegati") || title.includes("Curriculum")
           ? ["allegati"]
           : [];
   const integrationActive = integrationSession && automaticGroups.length
@@ -287,14 +291,6 @@ export function RevampStep4DisponibilitaPage() {
   function addEsp() { if (esperienze.length < 5) setEsperienze(prev => [...prev, mkEsp()]); }
   function removeEsp(idx: number) { setEsperienze(prev => prev.filter((_, i) => i !== idx)); }
 
-  /* ── 3A E — Referenze ── */
-  const [referenze, setReferenze] = useState<Referenza[]>([]);
-
-  function updateRef(idx: number, field: keyof Referenza, val: string) {
-    setReferenze(prev => prev.map((r, i) => i === idx ? { ...r, [field]: val } : r));
-  }
-  function addRef() { if (referenze.length < 2) setReferenze(prev => [...prev, mkRef()]); }
-  function removeRef(idx: number) { setReferenze(prev => prev.filter((_, i) => i !== idx)); }
 
   /* ── 3A F — Allegati ── */
   const [cvAttachment, setCvAttachment] = useState<AttachmentUploadResult | null>(null);
@@ -361,7 +357,7 @@ export function RevampStep4DisponibilitaPage() {
     if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
     const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
     return () => clearTimeout(timer);
-  }, [disponibilita, areeSpecifiche, tariffaGiorn, tariffaOra, esperienze, referenze, areaTerrB, tariffaOraB]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [disponibilita, areeSpecifiche, tariffaGiorn, tariffaOra, esperienze, areaTerrB, tariffaOraB]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function clearErr(key: string) {
     setErrors(p => { const n = { ...p }; delete n[key]; return n; });
@@ -436,13 +432,10 @@ export function RevampStep4DisponibilitaPage() {
       areaTerrB, tariffaOraB,
       espCount: esperienze.length,
       committenti: esperienze.map(e => e.committente),
-      tipiIntervento: esperienze.map(e => e.tipoIntervento),
       periodi: esperienze.map(e => `${e.periodoFrom}-${e.periodoTo}`),
       cvName: activeCv?.fileName ?? null,
       certName: certAttachment?.fileName ?? null,
       operationalCapacity: isDocente ? (disponibilita || "disponibile") : (areaTerrB || "disponibile"),
-      references: referenze,
-      referenze,
       attachments,
     };
   }
@@ -467,13 +460,14 @@ export function RevampStep4DisponibilitaPage() {
       for (let i = 0; i < esperienze.length; i++) {
         const esp = esperienze[i];
         if (!esp.committente.trim()) e[`esp_${i}_committente`]   = "Obbligatorio.";
-        if (!esp.tipoIntervento)    e[`esp_${i}_tipoIntervento`] = "Obbligatorio.";
         if (!esp.ambitoTematico)    e[`esp_${i}_ambitoTematico`] = "Obbligatorio.";
-        if (!esp.periodoFrom.trim())e[`esp_${i}_periodoFrom`]    = "Obbligatorio.";
-        if (!esp.periodoTo.trim())  e[`esp_${i}_periodoTo`]      = "Obbligatorio.";
+        if (!esp.periodoFrom.trim()) e[`esp_${i}_periodoFrom`] = "Obbligatorio.";
+        else if (!isValidMonthYear(esp.periodoFrom)) e[`esp_${i}_periodoFrom`] = "Formato non valido (MM/AAAA).";
+        if (!esp.periodoTo.trim())   e[`esp_${i}_periodoTo`]   = "Obbligatorio.";
+        else if (!isValidMonthYear(esp.periodoTo))   e[`esp_${i}_periodoTo`]   = "Formato non valido (MM/AAAA).";
+        else if (isToBeforeFrom(esp.periodoFrom, esp.periodoTo)) e[`esp_${i}_periodoTo`] = "La data di fine non può essere precedente a quella di inizio.";
         if (!esp.durata.trim())     e[`esp_${i}_durata`]         = "Obbligatorio.";
         if (!esp.modalita)          e[`esp_${i}_modalita`]       = "Obbligatorio.";
-        if (esp.finanziata === "si" && !esp.fondoProgramma.trim()) e[`esp_${i}_fondoProgramma`] = "Indica il fondo o il programma.";
       }
       if (!cvAttachment) e.cv = "Il Curriculum Vitae è obbligatorio.";
     } else {
@@ -494,7 +488,6 @@ export function RevampStep4DisponibilitaPage() {
       areaTerrB, tariffaOraB,
       espCount: esperienze.length,
       committenti: esperienze.map(e => e.committente),
-      tipiIntervento: esperienze.map(e => e.tipoIntervento),
       periodi: esperienze.map(e => `${e.periodoFrom}–${e.periodoTo}`),
       cvName: activeCv?.fileName ?? null,
       certName: certAttachment?.fileName ?? null,
@@ -564,7 +557,6 @@ export function RevampStep4DisponibilitaPage() {
     navigate(integrationEdit?.returnPath ?? renewalEdit?.returnPath ?? `/apply/${registryParam}/step/5`);
   }
 
-  const errorCount = Object.keys(errors).length;
 
   return (
     <div style={{ margin: "-1rem", background: "#f0f4f8", minHeight: "100%" }}>
@@ -589,38 +581,6 @@ export function RevampStep4DisponibilitaPage() {
         ══════════════════════════════════════════ */}
         {isDocente && (
           <>
-            {/* C — Disponibilità, Territorio e Condizioni Operative */}
-            <SectionCard title="C — Disponibilità, Territorio e Condizioni Operative" accent={accent}>
-              <div style={{ maxWidth: 480, marginBottom: 14 }}>
-                <Select label="Disponibilità a trasferte fuori area" required value={disponibilita}
-                  onChange={e => { setDisponibilita(e.target.value); clearErr("disponibilita"); }}
-                  options={[
-                    { value: "si",          label: "Sì, senza limitazioni (con rimborso spese concordato)" },
-                    { value: "si_aree",     label: "Sì, solo in aree specifiche (indicare)" },
-                    { value: "lunga_dur",   label: "Solo per progetti di lunga durata (>5 giornate)" },
-                    { value: "no",          label: "No" },
-                  ]}
-                  error={errors.disponibilita} />
-              </div>
-              {disponibilita === "si_aree" && (
-                <div style={{ marginBottom: 14 }}>
-                  <Field label="Aree geografiche disponibili" required value={areeSpecifiche}
-                    onChange={e => { setAreeSpecifiche(e.target.value); clearErr("areeSpecifiche"); }}
-                    placeholder="Es. Lombardia, Piemonte, Liguria..." error={errors.areeSpecifiche} />
-                </div>
-              )}
-              <p style={{ fontSize: "0.8rem", color: MUTED, margin: "0 0 12px" }}>
-                Le tariffe sono riservate e visibili solo agli operatori back-end con accesso completo. Non vengono pubblicate nel profilo pubblico.
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Field label="Tariffa giornaliera (8h) indicativa" hint="opzionale"
-                  value={tariffaGiorn} onChange={e => setTariffaGiorn(e.target.value)}
-                  placeholder="Es. 300–400 €/giornata" />
-                <Field label="Tariffa oraria indicativa" hint="opzionale"
-                  value={tariffaOra} onChange={e => setTariffaOra(e.target.value)}
-                  placeholder="Es. 50–70 €/ora" />
-              </div>
-            </SectionCard>
 
             {/* D — Esperienze formative */}
             <SectionCard title="D — Esperienze formative" accent={accent}
@@ -647,11 +607,7 @@ export function RevampStep4DisponibilitaPage() {
                       options={SETTORI_COMMITTENTE} />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <Select label="Tipo di intervento" required value={esp.tipoIntervento}
-                      onChange={e => updateEsp(idx, "tipoIntervento", e.target.value)}
-                      options={TIPO_INTERVENTO}
-                      error={errors[`esp_${idx}_tipoIntervento`]} />
+                  <div style={{ marginBottom: 12 }}>
                     <Field label="Titolo / descrizione del corso o intervento" hint="opzionale" value={esp.tipoIntTesto}
                       onChange={e => updateEsp(idx, "tipoIntTesto", e.target.value)}
                       placeholder="Es. Corso Excel avanzato per HR" />
@@ -666,17 +622,25 @@ export function RevampStep4DisponibilitaPage() {
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <Field label="Periodo — da (MM/AAAA)" required value={esp.periodoFrom}
-                      onChange={e => updateEsp(idx, "periodoFrom", e.target.value)}
+                      onChange={e => updateEsp(idx, "periodoFrom", fmtMonthYear(e.target.value))}
+                      onBlur={() => {
+                        const v = esp.periodoFrom;
+                        if (v.trim() && !isValidMonthYear(v)) setErrors(prev => ({ ...prev, [`esp_${idx}_periodoFrom`]: "Formato non valido (MM/AAAA)." }));
+                        else if (v.trim()) setErrors(prev => { const n = { ...prev }; delete n[`esp_${idx}_periodoFrom`]; return n; });
+                      }}
                       placeholder="01/2023" error={errors[`esp_${idx}_periodoFrom`]} />
                     <Field label="Periodo — a (MM/AAAA)" required value={esp.periodoTo}
-                      onChange={e => updateEsp(idx, "periodoTo", e.target.value)}
+                      onChange={e => updateEsp(idx, "periodoTo", fmtMonthYear(e.target.value))}
+                      onBlur={() => {
+                        const v = esp.periodoTo;
+                        if (v.trim() && !isValidMonthYear(v)) setErrors(prev => ({ ...prev, [`esp_${idx}_periodoTo`]: "Formato non valido (MM/AAAA)." }));
+                        else if (v.trim() && isToBeforeFrom(esp.periodoFrom, v)) setErrors(prev => ({ ...prev, [`esp_${idx}_periodoTo`]: "La data di fine non può essere precedente a quella di inizio." }));
+                        else if (v.trim()) setErrors(prev => { const n = { ...prev }; delete n[`esp_${idx}_periodoTo`]; return n; });
+                      }}
                       placeholder="06/2023" error={errors[`esp_${idx}_periodoTo`]} />
-                    <Field label="Durata totale" required value={esp.durata}
+                    <Field label="Durata totale in ore" required value={esp.durata}
                       onChange={e => updateEsp(idx, "durata", e.target.value)}
-                      placeholder="Es. 24 ore / 3 giornate" error={errors[`esp_${idx}_durata`]} />
-                    <Field label="N. partecipanti (indicativo)" hint="opz." value={esp.nPartecipanti}
-                      onChange={e => updateEsp(idx, "nPartecipanti", e.target.value)}
-                      placeholder="Es. 15" />
+                      placeholder="Es. 24" error={errors[`esp_${idx}_durata`]} />
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
@@ -688,7 +652,7 @@ export function RevampStep4DisponibilitaPage() {
                       onChange={e => updateEsp(idx, "finanziata", e.target.value)}
                       options={[{ value: "si", label: "Sì" }, { value: "no", label: "No" }]} />
                     {esp.finanziata === "si" && (
-                      <Field label="Fondo o programma" required value={esp.fondoProgramma}
+                      <Field label="Fondo o programma" hint="opz." value={esp.fondoProgramma}
                         onChange={e => updateEsp(idx, "fondoProgramma", e.target.value)}
                         placeholder="Es. FSE+ 2021–27, FON.TER"
                         error={errors[`esp_${idx}_fondoProgramma`]} />
@@ -704,34 +668,6 @@ export function RevampStep4DisponibilitaPage() {
               )}
             </SectionCard>
 
-            {/* E — Referenze */}
-            <SectionCard title="E — Referenze" accent={accent}
-              badge="fino a 2 — opzionale"
-              desc="Indica persone che possono attestare la tua collaborazione. Le informazioni di contatto sono riservate.">
-              {referenze.map((ref, idx) => (
-                <div key={idx} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "16px 18px", marginBottom: 12, background: "#fafafa" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.88rem", color: accent }}>Referente {idx + 1}</div>
-                    <button type="button" onClick={() => removeRef(idx)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", border: "1px solid #fca5a5", background: "#fff5f5", borderRadius: 5, fontSize: "0.75rem", color: "#b91c1c", cursor: "pointer", fontWeight: 600 }}>
-                      <Trash2 size={12} /> Rimuovi
-                    </button>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                    <Field label="Nome e Cognome" value={ref.nome}
-                      onChange={e => updateRef(idx, "nome", e.target.value)} placeholder="Mario Bianchi" />
-                    <Field label="Ruolo e Organizzazione" value={ref.ruolo}
-                      onChange={e => updateRef(idx, "ruolo", e.target.value)} placeholder="Responsabile HR, Azienda XYZ" />
-                    <Field label="E-mail o telefono" value={ref.contatto}
-                      onChange={e => updateRef(idx, "contatto", e.target.value)} placeholder="m.bianchi@azienda.it" />
-                  </div>
-                </div>
-              ))}
-              {referenze.length < 2 && (
-                <button type="button" onClick={addRef} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", background: "#fff", border: `1.5px dashed ${accent}`, borderRadius: 6, color: accent, fontSize: "0.83rem", fontWeight: 600, cursor: "pointer" }}>
-                  <Plus size={14} /> Aggiungi un referente ({referenze.length}/2)
-                </button>
-              )}
-            </SectionCard>
 
             {/* F — Allegati */}
             <SectionCard title="F — Allegati" accent={accent}
@@ -785,14 +721,6 @@ export function RevampStep4DisponibilitaPage() {
           </>
         )}
 
-        {/* ── Error summary ── */}
-        {errorCount > 0 && (
-          <div style={{ background: WARN_BG, border: `1px solid ${WARN_BORDER}`, borderRadius: 6, padding: "12px 16px" }}>
-            <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#92400e" }}>
-              ⚠ {errorCount} {errorCount === 1 ? "campo richiede attenzione" : "campi richiedono attenzione"}
-            </div>
-          </div>
-        )}
         {saveError ? (
           <div style={{ background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 6, padding: "12px 16px", fontSize: "0.82rem", color: "#b91c1c" }}>
             {saveError}

@@ -78,14 +78,13 @@ public class RevampSectionPayloadValidator {
                 requireAnyNonBlank(payload, "fullName");
                 requireAnyNonBlank(payload, "birthDate");
                 requireAnyNonBlank(payload, "birthPlace");
+                requireAnyNonBlank(payload, "birthProvince");
                 requireAnyNonBlank(payload, "taxCode");
                 requireAnyNonBlank(payload, "addressLine");
                 requireAnyNonBlank(payload, "streetNumber");
                 requireAnyNonBlank(payload, "city");
                 requireAnyNonBlank(payload, "postalCode");
                 requireAnyNonBlank(payload, "province");
-                requireAnyNonBlank(payload, "stato");
-                requireAnyNonBlank(payload, "region");
                 requireAnyNonBlank(payload, "phone");
                 requireAnyNonBlank(payload, "email");
             }
