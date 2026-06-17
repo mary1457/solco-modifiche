@@ -197,7 +197,7 @@ public class RevampApplicationService {
                 scopedPayload,
                 completed,
                 () -> applicationSectionRepository
-                        .findByApplicationIdAndSectionKeyAndIsLatestTrue(applicationId, "S3A")
+                        .findByApplicationIdAndSectionKeyAndIsLatestTrue(applicationId, "S4A")
                         .map(RevampApplicationSection::getPayloadJson)
         );
         updateApplicationIdentityIfNeeded(application, sectionKey, validatedPayload);
@@ -389,11 +389,9 @@ public class RevampApplicationService {
             case "tipo_prof", "comp_secondarie", "ateco", "dimensione", "ateco_b",
                  "regioni_op", "acc_formazione", "terzo_settore" -> "S2";
             case "servizi_cat" -> "S3";
-            case "servizi_offerti", "cert_specifiche" -> "S3B";
-            case "istruzione", "territorio" -> applicationSectionRepository
-                    .findByApplicationIdAndSectionKeyAndIsLatestTrue(applicationId, "S3B")
-                    .isPresent() ? "S3B" : "S3A";
-            case "competenze", "lingue", "tariffe", "esperienze" -> "S3A";
+            case "servizi_offerti", "cert_specifiche" -> "S4B";
+            case "istruzione", "territorio" -> "S4A";
+            case "competenze", "lingue", "tariffe", "esperienze" -> "S4A";
             case "cap_operativa", "referenze", "allegati", "certificazioni", "allegati_b" -> "S4";
             case "dichiarazioni", "dichiarazioni_b" -> "S5";
             default -> fcrGroupKey;
@@ -408,7 +406,7 @@ public class RevampApplicationService {
             case "indirizzo" -> Set.of("country", "address", "addressLine", "streetNumber", "city", "province", "postalCode");
             case "contatti" -> Set.of("phone", "secondaryPhone", "phoneCode", "phoneSecondary", "phoneSecondaryCode", "email", "secondaryEmail", "emailSecondary", "pec", "website", "linkedin");
             case "dati_aziendali" -> Set.of("companyName", "legalForm");
-            case "identificativi" -> Set.of("vatNumber", "taxCodeIfDifferent", "reaNumber", "cciaaProvince", "incorporationDate");
+            case "identificativi" -> Set.of("vatNumber", "taxCodeIfDifferent", "reaNumber", "incorporationDate");
             case "sede_legale" -> Set.of("legalAddress");
             case "sede_operativa" -> Set.of("operationalHeadquarter");
             case "contatti_inst" -> Set.of("institutionalEmail", "pec", "phone", "website");
@@ -479,7 +477,7 @@ public class RevampApplicationService {
                 default -> Set.of();
             };
         }
-        if ("S3A".equals(sectionKey)) {
+        if ("S4A".equals(sectionKey)) {
             return switch (normalized) {
                 case "THEMATIC_SPECIFICATION" -> Set.of(
                         "competencies", "thematicAreasCsv", "aree", "docenzaPA",
@@ -491,7 +489,7 @@ public class RevampApplicationService {
                 default -> Set.of();
             };
         }
-        if ("S3B".equals(sectionKey)) {
+        if (sectionKey != null && sectionKey.startsWith("S4B_")) {
             return switch (normalized) {
                 case "THEMATIC_SPECIFICATION" -> Set.of(
                         "services", "servizi", "altroServ", "specificCertifications", "certB"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { ChevronDown, ChevronUp, Download, FileEdit, FileText, Globe, Handshake, Image, LayoutGrid, MapPin, MessageSquare, Star, User, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, FileEdit, FileText, Globe, Image, LayoutGrid, MapPin, MessageSquare, User, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { API_BASE_URL } from "../../api/http";
 import {
@@ -8,12 +8,10 @@ import {
   getRevampApplicationSections,
   getRevampApplicationCommunications,
   getOpenRevampIntegrationRequest,
-  getMyEvaluationAggregate,
   type RevampApplicationSummary,
   type RevampSectionSnapshot,
   type RevampApplicationCommunication,
   type RevampIntegrationRequestSummary,
-  type MyEvaluationAggregate,
 } from "../../api/revampApplicationApi";
 import { saveRevampApplicationIdForRegistry } from "../../utils/revampApplicationSession";
 import { consumeRevampIntegrationDrawerReopen, saveRevampIntegrationEditSession } from "../../utils/revampIntegrationEditSession";
@@ -66,9 +64,10 @@ const AREA_LABELS: Record<string, string> = {
 };
 
 const TIPOLOGIA_LABELS: Record<string, string> = {
-  docente: "Docente / Formatore", ricercatore: "Ricercatore / Valutatore",
-  cdo_lavoro: "Consulente del Lavoro", commercialista: "Commercialista",
-  avvocato: "Avvocato", psicologo: "Psicologo",
+  docente: "Docente / Formatore", consulente: "Consulente Aziendale",
+  psicologo: "Psicologo / Coach", consulente_hr: "Consulente HR / Sviluppo Organizzativo",
+  ricercatore: "Ricercatore / Valutatore", cdo_lavoro: "Consulente del Lavoro",
+  commercialista: "Commercialista", avvocato: "Avvocato",
   finanza: "Esperto Finanza Agevolata", orientatore: "Orientatore Professionale",
   coach: "Coach", mediatore: "Mediatore del Lavoro", altro: "Altro professionista",
 };
@@ -84,10 +83,6 @@ const TAX_REGIME_LABELS: Record<string, string> = {
   occasionale: "Regime occasionale", ditta: "Ditta individuale", altro: "Altro",
 };
 
-const DISPONIBILITA_LABELS: Record<string, string> = {
-  si: "Sì, senza limitazioni", si_aree: "Solo in aree specifiche",
-  lunga_dur: "Solo per progetti di lunga durata", no: "No",
-};
 
 const DIPENDENTI_LABELS: Record<string, string> = {
   solo_titolare: "Solo titolare / 1", "2_5": "2–5", "6_15": "6–15",
@@ -106,13 +101,6 @@ const MODELLO231_LABELS: Record<string, string> = {
   non_adottato: "Non adottato",
 };
 
-const EVALUATION_CATEGORY_LABELS: Record<string, string> = {
-  quality: "Qualita tecnica",
-  timeliness: "Rispetto tempi",
-  communication: "Comunicazione",
-  flexibility: "Flessibilita",
-  value: "Qualita/Prezzo"
-};
 
 const DOCENZA_PA_LABELS: Record<string, string> = {
   si_centrale: "Sì, PA centrale", si_locale: "Sì, PA locale",
@@ -148,7 +136,7 @@ STATUS_CFG.INTEGRATION_REQUIRED = {
 };
 STATUS_CFG.WAITING_SUPPLIER_RESPONSE = STATUS_CFG.INTEGRATION_REQUIRED;
 
-type Tab = "profilo" | "documenti" | "valutazioni" | "comunicazioni";
+type Tab = "profilo" | "documenti" | "comunicazioni";
 type SupplierCommunicationRow = {
   id: string;
   sortAt: string;
@@ -266,9 +254,9 @@ function sectionNameForStep(registryType: string, step: number): string {
   }
   const names: Record<number, string> = {
     1: "Anagrafica",
-    2: "Tipologia",
-    3: "Competenze",
-    4: "Disponibilita",
+    2: "Istruzione e CV",
+    3: "Tipologia",
+    4: "Competenze",
     5: "Dichiarazioni"
   };
   return names[step] ?? `Sezione ${step}`;
@@ -289,15 +277,6 @@ function a(val: unknown): string[] {
 
 /* ─── UI helpers ────────────────────────────────────── */
 
-function Stars({ rating }: { rating: number }) {
-  return (
-    <span style={{ display: "inline-flex", gap: 2 }}>
-      {[1, 2, 3, 4, 5].map(n => (
-        <Star key={n} size={13} fill={n <= Math.round(rating) ? "#f59e0b" : "none"} color="#f59e0b" strokeWidth={1.5} />
-      ))}
-    </span>
-  );
-}
 
 function Badge({ text, color }: { text: string; color: "green" | "yellow" | "navy" | "blue" | "red" | "gray" }) {
   const map = {
@@ -415,7 +394,6 @@ export function RevampSupplierDashboardPage() {
   const [sections, setSections]       = useState<Record<string, RevampSectionSnapshot>>({});
   const [activeTab, setActiveTab]     = useState<Tab>("profilo");
   const [showModal, setShowModal]     = useState(false);
-  const [evalAggregate, setEvalAggregate] = useState<MyEvaluationAggregate | null>(null);
   const [communications, setCommunications] = useState<RevampApplicationCommunication[]>([]);
   const [openIntegrationRequest, setOpenIntegrationRequest] = useState<RevampIntegrationRequestSummary | null>(null);
   const [integrationDrawerOpen, setIntegrationDrawerOpen] = useState(false);
@@ -472,7 +450,6 @@ export function RevampSupplierDashboardPage() {
           }
         }
         setLoading(false);
-        getMyEvaluationAggregate(auth.token!).then(setEvalAggregate).catch(() => {});
       })
       .catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -482,16 +459,13 @@ export function RevampSupplierDashboardPage() {
   /* ── parse all section payloads ── */
   const s1  = parseSection(sections, "S1");
   const s2  = parseSection(sections, "S2");
-  const s3  = parseSection(sections, "S3");   // Albo B services
-  const s3a = parseSection(sections, "S3A");  // Albo A docente
-  const s3b = parseSection(sections, "S3B");  // Albo A non-docente
-  const s4  = parseSection(sections, "S4");
+  const s3  = parseSection(sections, "S3");   // Albo A tipologia / Albo B services
+  const s4a = parseSection(sections, "S4A");  // Albo A docente competenze
+  const s4  = parseSection(sections, "S4");   // Albo B certs/allegati
   const s5  = parseSection(sections, "S5");
 
   /* ── sessionStorage fallbacks ── */
   const ss1A = JSON.parse(sessionStorage.getItem("revamp_s1")        ?? "{}") as Record<string, unknown>;
-  const ss3A = JSON.parse(sessionStorage.getItem("revamp_s3")        ?? "{}") as Record<string, unknown>;
-  const ss4A = JSON.parse(sessionStorage.getItem("revamp_s4")        ?? "{}") as Record<string, unknown>;
   const ss1B = JSON.parse(sessionStorage.getItem("revamp_b1")        ?? "{}") as Record<string, unknown>;
   const ss2B = JSON.parse(sessionStorage.getItem("revamp_b2")        ?? "{}") as Record<string, unknown>;
   const ss3B = JSON.parse(sessionStorage.getItem("revamp_b3")        ?? "{}") as Record<string, unknown>;
@@ -500,27 +474,28 @@ export function RevampSupplierDashboardPage() {
   const tipologiaSS = sessionStorage.getItem("revamp_tipologia") ?? "";
 
   /* ── per-section field getters ── */
-  const g1  = (k: string) => s(s1[k]  ?? ss1A[k]);
-  const g2  = (k: string) => s(s2[k]);
-  const g4  = (k: string) => s(s4[k]  ?? ss4A[k]);
-  const gb1 = (k: string) => s(s1[k]  ?? ss1B[k]);
-  const gb2 = (k: string) => s(s2[k]  ?? ss2B[k]);
-  const gb4 = (k: string) => s(s4[k]  ?? ss4B[k]);
-  const gb5 = (k: string) => s(s5[k]  ?? ss5B[k]);
-  const ga4 = (k: string) => a(s4[k]  ?? ss4A[k]);
-  const gab2 = (k: string) => a(s2[k] ?? ss2B[k]);
+  const g1   = (k: string) => s(s1[k]  ?? ss1A[k]);
+  const g2   = (k: string) => s(s2[k]);
+  const gb1  = (k: string) => s(s1[k]  ?? ss1B[k]);
+  const gb2  = (k: string) => s(s2[k]  ?? ss2B[k]);
+  const gb4  = (k: string) => s(s4[k]  ?? ss4B[k]);
+  const gb5  = (k: string) => s(s5[k]  ?? ss5B[k]);
+  const gab2 = (k: string) => a(s2[k]  ?? ss2B[k]);
 
-  /* ── Albo A: pick correct S3 source based on tipologia ── */
-  const tipologia = g2("tipologia") || tipologiaSS;
+  /* ── Albo A: tipologia from S3, competenze from S4A/S4B_* ── */
+  const tipologia = isA ? (s(s3["tipologia"]) || tipologiaSS) : "";
   const isDocente = isA && tipologia === "docente";
-  const s3act  = isDocente ? s3a : s3b;
-  const g3  = (k: string) => s(s3act[k] ?? ss3A[k]);
-  const ga3 = (k: string) => a(s3act[k] ?? ss3A[k]);
+  const s4bKey    = tipologia && !isDocente ? `S4B_${tipologia}` : "";
+  const s4b       = s4bKey ? parseSection(sections, s4bKey) : ({} as Record<string, unknown>);
+  const s4act     = isDocente ? s4a : s4b;
+  const g3        = (k: string) => s(s4act[k]);
+  const ga3       = (k: string) => a(s4act[k]);
 
-  /* ── Albo A: experiences from S4 ── */
-  const espCommittenti = ga4("committenti");
-  const espTipi        = ga4("tipiIntervento");
-  const espPeriodi     = ga4("periodi");
+  /* ── Albo A: experiences from S4A (docente esperienze array) ── */
+  const rawEsperienze  = isDocente ? (Array.isArray(s4a.esperienze) ? s4a.esperienze as Record<string, unknown>[] : []) : [];
+  const espCommittenti = rawEsperienze.map(e => s(e.committente)).filter(Boolean);
+  const espTipi        = rawEsperienze.map(e => s(e.tipoIntervento));
+  const espPeriodi     = rawEsperienze.map(e => s(e.periodo));
   const espCount       = espCommittenti.length;
 
   /* ── Albo B: S3 categories ── */
@@ -676,7 +651,6 @@ export function RevampSupplierDashboardPage() {
   const tabItems: { id: Tab; label: string }[] = [
     { id: "profilo",       label: "Il mio profilo" },
     { id: "documenti",     label: "Documenti" },
-    { id: "valutazioni",   label: "Valutazioni" },
     { id: "comunicazioni", label: "Comunicazioni" },
   ];
 
@@ -789,7 +763,18 @@ export function RevampSupplierDashboardPage() {
     }
   }
 
-  const s4Attachments = Array.isArray(s4.attachments)
+  // Albo A: CV and attachments are now in S2 (Istruzione e CV step)
+  const s2Attachments = isA && Array.isArray(s2.attachments)
+    ? (s2.attachments as Array<{ documentType?: string; fileName?: string; storageKey?: string; mimeType?: string; sizeBytes?: number }>)
+    : [];
+  for (const att of s2Attachments) {
+    if (!att.fileName || !att.storageKey) continue;
+    const typeLabel = att.documentType === "CV" ? "Curriculum Vitae" : att.documentType === "CERTIFICATION" ? "Certificazione" : att.documentType ?? "Documento";
+    docsList.push({ label: typeLabel, subLabel: "Sezione 2", fileName: att.fileName, storageKey: att.storageKey, mimeType: att.mimeType ?? "application/octet-stream", sizeBytes: att.sizeBytes ?? 0 });
+  }
+
+  // Albo B: certs and attachments are in S4
+  const s4Attachments = !isA && Array.isArray(s4.attachments)
     ? (s4.attachments as Array<{ documentType?: string; fileName?: string; storageKey?: string; mimeType?: string; sizeBytes?: number }>)
     : [];
   for (const att of s4Attachments) {
@@ -894,8 +879,9 @@ export function RevampSupplierDashboardPage() {
   }
 
   /* ── completed section count ── */
+  const s4aOrB = sections.S4A ?? (s4bKey ? sections[s4bKey] : undefined);
   const completedCount = isA
-    ? [sections.S1, sections.S2, sections.S3A ?? sections.S3B ?? sections.S3, sections.S4, sections.S5].filter(sec => sec?.completed).length
+    ? [sections.S1, sections.S2, sections.S3, s4aOrB, sections.S5].filter(sec => sec?.completed).length
     : [sections.S1, sections.S2, sections.S3, sections.S4, sections.S5].filter(sec => sec?.completed).length;
 
   if (loading) {
@@ -1216,25 +1202,6 @@ export function RevampSupplierDashboardPage() {
           {/* Stats */}
           <div style={{ display: "flex", gap: 14, marginBottom: 20 }}>
             <StatCard
-              label="Punteggio medio"
-              value={evalAggregate && evalAggregate.activeEvaluations > 0 ? evalAggregate.averageOverallScore.toFixed(1) : "—"}
-              sub={evalAggregate && evalAggregate.activeEvaluations > 0 ? `su ${evalAggregate.activeEvaluations} valutazion${evalAggregate.activeEvaluations === 1 ? "e" : "i"}` : "nessuna valutazione ancora"}
-              tone="tone-attention"
-              icon={<Star size={14} />}
-              pill={evalAggregate && evalAggregate.activeEvaluations > 0 ? {
-                text: evalAggregate.averageOverallScore >= 4.5 ? "Eccellente" : evalAggregate.averageOverallScore >= 3.5 ? "Buono" : evalAggregate.averageOverallScore >= 2.5 ? "Nella media" : "Da migliorare",
-                level: evalAggregate.averageOverallScore >= 4.5 ? "ok" : evalAggregate.averageOverallScore >= 3.5 ? "info" : "attention"
-              } : undefined}
-            />
-            <StatCard
-              label="Collaborazioni"
-              value={evalAggregate ? String(evalAggregate.activeEvaluations) : "0"}
-              sub={evalAggregate && evalAggregate.activeEvaluations > 0 ? "valutazioni ricevute" : "da avviare"}
-              tone="tone-info"
-              icon={<Handshake size={14} />}
-              pill={evalAggregate && evalAggregate.activeEvaluations > 0 ? { text: "Attivo", level: "ok" } : { text: "Nessuna", level: "info" }}
-            />
-            <StatCard
               label="Stato candidatura"
               value={statusCfg.label}
               sub={submittedAt ? `Inviata ${submittedAt}` : "—"}
@@ -1271,16 +1238,6 @@ export function RevampSupplierDashboardPage() {
                 <div className="supplier-identity-meta">
                   {roleOrType}{location ? ` — ${location}` : ""}
                 </div>
-                {isA && (
-                  <div className="supplier-identity-rating">
-                    <Stars rating={evalAggregate?.averageOverallScore ?? 0} />
-                    <span>
-                      {evalAggregate && evalAggregate.activeEvaluations > 0
-                        ? `${evalAggregate.averageOverallScore.toFixed(1)} / 5`
-                        : "nessuna valutazione"}
-                    </span>
-                  </div>
-                )}
                 <div style={{ marginTop: 10 }}>
                   <Badge
                     text={statusCfg.label}
@@ -1345,91 +1302,90 @@ export function RevampSupplierDashboardPage() {
                   <SectionCard n={1} title="Dati Anagrafici" done={!!sections.S1?.completed}>
                     <SubHead title="Dati personali" />
                     <DataRow label="Nome e cognome"   value={g1("fullName")} />
+                    <DataRow label="Data di nascita"  value={g1("birthDate")} />
+                    <DataRow label="Luogo di nascita" value={[g1("birthPlace"), g1("birthProvince") ? `(${g1("birthProvince")})` : ""].filter(Boolean).join(" ")} />
                     <DataRow label="Codice Fiscale"   value={g1("taxCode")} />
                     <DataRow label="Partita IVA"      value={g1("vatNumber")} />
                     <DataRow label="Regime fiscale"   value={TAX_REGIME_LABELS[g1("taxRegime")] ?? g1("taxRegime")} />
+                    <DataRow label="Cassa prev."      value={g1("cassa")} />
 
                     <SubHead title="Indirizzo professionale / residenza" />
-                    <DataRow label="Via e civico"     value={g1("address")} />
+                    <DataRow label="Via e civico"     value={[g1("addressLine"), g1("streetNumber")].filter(Boolean).join(" ")} />
                     <DataRow label="Comune"           value={[g1("city"), g1("postalCode") ? `– ${g1("postalCode")}` : "", g1("province") ? `(${g1("province")})` : ""].filter(Boolean).join(" ")} />
 
                     <SubHead title="Contatti" />
                     <DataRow label="Telefono"         value={g1("phone")} />
+                    <DataRow label="Telefono sec."    value={g1("secondaryPhone")} />
                     <DataRow label="E-mail"           value={g1("email")} />
+                    <DataRow label="E-mail sec."      value={g1("secondaryEmail")} />
+                    <DataRow label="PEC"              value={g1("pec")} />
+                    <DataRow label="Sito web"         value={g1("website")} />
                     <DataRow label="LinkedIn"         value={g1("linkedin")} />
                   </SectionCard>
 
-                  {/* S2 — Tipologia */}
-                  <SectionCard n={2} title="Tipologia Professionale" done={!!sections.S2?.completed}>
-                    <DataRow label="Tipologia"        value={TIPOLOGIA_LABELS[tipologia] ?? tipologia} />
-                    <DataRow label="Codice ATECO"     value={g2("ateco")} />
-                    {a(s2.multiRuoli).length > 0 && (
+                  {/* S2 — Istruzione e CV */}
+                  <SectionCard n={2} title="Istruzione e CV" done={!!sections.S2?.completed}>
+                    <SubHead title="Formazione" />
+                    <DataRow label="Titolo di studio"    value={g2("titoloStudio")} />
+                    <DataRow label="Ambito di studio"    value={g2("ambitoStudio") || g2("ambitoDropdown")} />
+                    <DataRow label="Anno conseguimento"  value={g2("annoConseg")} />
+                    {(() => {
+                      const cv = (Array.isArray(s2.attachments) ? s2.attachments as Array<{ documentType?: string; fileName?: string }> : []).find(a => a.documentType === "CV");
+                      return cv?.fileName ? <DataRow label="Curriculum Vitae" value={cv.fileName} /> : null;
+                    })()}
+                  </SectionCard>
+
+                  {/* S3 — Tipologia */}
+                  <SectionCard n={3} title="Tipologia Professionale" done={!!sections.S3?.completed}>
+                    <DataRow label="Tipologia principale" value={TIPOLOGIA_LABELS[tipologia] ?? tipologia} />
+                    <DataRow label="Codice ATECO"         value={s(s3["atecoCode"])} />
+                    {a(s3["multiRuoli"]).length > 0 && (
                       <>
                         <SubHead title="Ruoli aggiuntivi" />
-                        <div>{a(s2.multiRuoli).map(r => <TagPill key={r} text={TIPOLOGIA_LABELS[r] ?? r} />)}</div>
+                        <div>{a(s3["multiRuoli"]).map(r => <TagPill key={r} text={TIPOLOGIA_LABELS[r] ?? r} />)}</div>
                       </>
                     )}
                   </SectionCard>
 
-                  {/* S3A — Competenze (Docente) */}
-                  {isDocente && (
-                    <SectionCard n={3} title="Competenze — Docente / Formatore" done={!!sections.S3A?.completed}>
-                      <SubHead title="Istruzione e abilitazioni" />
-                      <DataRow label="Titolo di studio"    value={g3("titoloStudio")} />
-                      <DataRow label="Anno conseguimento"  value={g3("annoConseg")} />
-                      <DataRow label="Ambito di studio"    value={g3("ambitoStudio")} />
-                      <DataRow label="Certificazioni"      value={g3("certAbitazioni")} />
-
-                      <SubHead title="Aree tematiche" />
-                      {ga3("aree").length > 0
-                        ? <div>{ga3("aree").map(id => <TagPill key={id} text={AREA_LABELS[id] ?? id} />)}</div>
-                        : <span style={{ fontSize: "0.8rem", color: MUTED }}>—</span>}
-
-                      <SubHead title="Operatività e contesto" />
-                      <DataRow label="Docenza PA"          value={DOCENZA_PA_LABELS[g3("docenzaPA")] ?? g3("docenzaPA")} />
-                      <DataRow label="Area territoriale"   value={g3("areaTerritoriale")} />
-                      <DataRow label="Lingue parlate"      value={g3("lingue")} />
-                      <DataRow label="Lingue docenza"      value={g3("lingueDocenza")} />
-                      <DataRow label="Strumenti digitali"  value={g3("strumenti")} />
-                      <DataRow label="Reti / associazioni" value={g3("reti")} />
-                      {a(s3act.consulenza ?? ss3A.consulenza).length > 0 && (
-                        <>
-                          <SubHead title="Ambiti di consulenza" />
-                          <div>{a(s3act.consulenza ?? ss3A.consulenza).map(c => <TagPill key={c} text={c} />)}</div>
-                        </>
-                      )}
-                    </SectionCard>
-                  )}
-
-                  {/* S3B — Competenze (Non-Docente) */}
-                  {!isDocente && (
-                    <SectionCard n={3} title="Competenze — Profilo Professionale" done={!!sections.S3B?.completed}>
-                      <SubHead title="Formazione e profilo" />
-                      <DataRow label="Titolo di studio"      value={g3("titoloB")} />
-                      <DataRow label="Ambito di studio"      value={g3("ambitoB")} />
-                      <DataRow label="Anni di esperienza"    value={g3("anniEsp")} />
-                      <DataRow label="Ordine professionale"  value={g3("ordine")} />
-                      <DataRow label="Certificazioni"        value={g3("certB")} />
-
-                      {ga3("servizi").length > 0 && (
-                        <>
-                          <SubHead title="Servizi offerti" />
-                          <div>{ga3("servizi").map(sv => <TagPill key={sv} text={sv} />)}</div>
-                        </>
-                      )}
-                      <DataRow label="Altro / note servizi"  value={g3("altroServ")} />
-                    </SectionCard>
-                  )}
-
-                  {/* S4 — Disponibilità */}
-                  <SectionCard n={4} title={isDocente ? "Disponibilità, Esperienze e Allegati" : "Disponibilità e Allegati"} done={!!sections.S4?.completed}>
+                  {/* S4A / S4B — Competenze */}
+                  <SectionCard n={4} title={isDocente ? "Competenze — Docente / Formatore" : "Competenze Professionali"} done={!!s4aOrB?.completed}>
                     {isDocente ? (
                       <>
-                        <SubHead title="Disponibilità e tariffe" />
-                        <DataRow label="Trasferte"           value={DISPONIBILITA_LABELS[g4("disponibilita")] ?? g4("disponibilita")} />
-                        <DataRow label="Aree geografiche"    value={g4("areeSpecifiche")} />
-                        <DataRow label="Tariffa giornaliera" value={g4("tariffaGiorn")} />
-                        <DataRow label="Tariffa oraria"      value={g4("tariffaOra")} />
+                        <SubHead title="Aree tematiche" />
+                        {ga3("aree").length > 0
+                          ? <div>{ga3("aree").map(id => <TagPill key={id} text={AREA_LABELS[id] ?? id} />)}</div>
+                          : <span style={{ fontSize: "0.8rem", color: MUTED }}>—</span>}
+
+                        <SubHead title="Operatività" />
+                        <DataRow label="Docenza PA"           value={DOCENZA_PA_LABELS[g3("docenzaPA")] ?? g3("docenzaPA")} />
+                        {s4act.tuttaItaliaA === true
+                          ? <DataRow label="Disponibilità geografica" value="Tutta Italia" />
+                          : ga3("regioniA").length > 0 && (
+                            <>
+                              <SubHead title="Regioni di operatività" />
+                              <div>{ga3("regioniA").map(r => <TagPill key={r} text={r} />)}</div>
+                            </>
+                          )
+                        }
+                        {ga3("lingue").length > 0 && (
+                          <DataRow label="Lingue docenza" value={ga3("lingue").join(", ")} />
+                        )}
+                        {ga3("lingueDocenza").length > 0 && (
+                          <DataRow label="Lingue (altre)" value={ga3("lingueDocenza").join(", ")} />
+                        )}
+                        <DataRow label="Strumenti digitali"  value={g3("strumenti")} />
+                        <DataRow label="Reti / associazioni" value={g3("reti")} />
+                        {ga3("consulenza").length > 0 && (
+                          <>
+                            <SubHead title="Ambiti di consulenza" />
+                            <div>{ga3("consulenza").map(c => <TagPill key={c} text={c} />)}</div>
+                          </>
+                        )}
+                        <DataRow label="Certificazioni"      value={g3("certAbitazioni")} />
+                        {(() => {
+                          const cert = (Array.isArray(s4act.attachments) ? s4act.attachments as Array<{ documentType?: string; fileName?: string }> : []).find(a => a.documentType === "CERTIFICATION");
+                          return cert?.fileName ? <DataRow label="File certificazione" value={cert.fileName} /> : null;
+                        })()}
 
                         {espCount > 0 && (
                           <>
@@ -1443,16 +1399,19 @@ export function RevampSupplierDashboardPage() {
                             ))}
                           </>
                         )}
-
-                        <SubHead title="Allegati" />
-                        <DataRow label="Curriculum Vitae"    value={g4("cvName")} />
-                        <DataRow label="Certificazioni"      value={g4("certName")} />
                       </>
                     ) : (
                       <>
-                        <DataRow label="Area territoriale"   value={g4("areaTerrB")} />
-                        <DataRow label="Tariffa oraria"      value={g4("tariffaOraB")} />
-                        <DataRow label="Curriculum Vitae"    value={g4("cvName")} />
+                        <DataRow label="Anni di esperienza"    value={g3("anniEsp") || g3("experienceBand")} />
+                        <DataRow label="Ordine professionale"  value={g3("ordine") || g3("professionalOrder")} />
+                        <DataRow label="Certificazioni"        value={g3("certB")} />
+                        {(ga3("servizi").length > 0 || ga3("services").length > 0) && (
+                          <>
+                            <SubHead title="Servizi offerti" />
+                            <div>{(ga3("servizi").length > 0 ? ga3("servizi") : ga3("services")).map(sv => <TagPill key={sv} text={sv} />)}</div>
+                          </>
+                        )}
+                        <DataRow label="Note servizi"          value={g3("altroServ")} />
                       </>
                     )}
                   </SectionCard>
@@ -1460,13 +1419,24 @@ export function RevampSupplierDashboardPage() {
                   {/* S5 — Dichiarazioni */}
                   <SectionCard n={5} title="Dichiarazioni e Consensi" done={!!sections.S5?.completed}>
                     {sections.S5?.completed ? (
-                      <>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
-                          <span style={{ color: "#16a34a", fontSize: "1.1rem" }}>✓</span>
-                          <span style={{ fontSize: "0.84rem", fontWeight: 600, color: "#1e293b" }}>Tutte le dichiarazioni obbligatorie accettate</span>
-                        </div>
-                        <DataRow label="Consenso commerciale" value={s5.marketingConsent ? "Sì" : s5.marketingConsent === false ? "No" : ""} />
-                      </>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        {([
+                          { key: "noCriminalConvictions",          label: "Assenza condanne penali ostative" },
+                          { key: "noConflictOfInterest",           label: "Assenza conflitti di interesse" },
+                          { key: "truthfulnessDeclaration",        label: "Veridicità delle informazioni" },
+                          { key: "privacyAccepted",                label: "Privacy Policy — art. 13 GDPR" },
+                          { key: "alboDataProcessingConsent",      label: "Consenso trattamento Albo Fornitori" },
+                          { key: "ethicalCodeAccepted",            label: "Codice Etico Gruppo Solco" },
+                          { key: "qualityEnvSafetyAccepted",       label: "Standard qualità, ambiente e sicurezza" },
+                          { key: "dlgs81ComplianceWhenInPresence", label: "Conformità D.Lgs. 81/2008" },
+                          { key: "marketingConsent",               label: "Consenso comunicazioni commerciali" },
+                        ] as { key: string; label: string }[]).filter(d => s5[d.key] !== undefined).map(({ key, label }) => (
+                          <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: "0.82rem" }}>
+                            <span style={{ color: s5[key] ? "#16a34a" : MUTED, fontSize: "1rem", flexShrink: 0, width: 16, textAlign: "center" as const }}>{s5[key] ? "✓" : "—"}</span>
+                            <span style={{ color: "#1e293b" }}>{label}</span>
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <span style={{ fontSize: "0.82rem", color: MUTED }}>Sezione non ancora completata.</span>
                     )}
@@ -1489,6 +1459,7 @@ export function RevampSupplierDashboardPage() {
                     <SubHead title="Sede legale" />
                     <DataRow label="Via e civico"       value={gb1("indirizzoLegale")} />
                     <DataRow label="Comune"             value={[gb1("comuneLegale"), gb1("capLegale") ? `– ${gb1("capLegale")}` : "", gb1("provinciaLegale") ? `(${gb1("provinciaLegale")})` : ""].filter(Boolean).join(" ")} />
+                    <DataRow label="Regione"            value={gb1("regioneLegale")} />
                     <DataRow label="Sede operativa"     value={gb1("sedeOperativa")} />
 
                     <SubHead title="Contatti istituzionali" />
@@ -1496,11 +1467,13 @@ export function RevampSupplierDashboardPage() {
                     <DataRow label="PEC"                value={gb1("pec")} />
                     <DataRow label="Telefono"           value={gb1("telefono")} />
                     <DataRow label="Sito web"           value={gb1("sitoWeb")} />
+                    <DataRow label="LinkedIn"           value={gb1("linkedin")} />
 
                     <SubHead title="Legale rappresentante" />
                     <DataRow label="Nome e cognome"     value={gb1("lrNomeCognome")} />
                     <DataRow label="Codice Fiscale"     value={gb1("lrCodiceFiscale")} />
                     <DataRow label="Ruolo / carica"     value={gb1("lrRuolo")} />
+                    <DataRow label="Scadenza doc. id."  value={gb1("lrIdDocumentExpiry")} />
 
                     <SubHead title="Referente operativo" />
                     <DataRow label="Nome e cognome"     value={gb1("refNome")} />
@@ -1675,96 +1648,6 @@ export function RevampSupplierDashboardPage() {
                   </div>
                 );
               })}
-            </div>
-          )}
-        </div>
-      )}
-      {/* ── Tab: Valutazioni ── */}
-      {activeTab === "valutazioni" && (
-        <div style={{ maxWidth: 1080, margin: "24px auto 32px", padding: "0 24px", width: "100%" }}>
-          <div className="supplier-documents-head">
-            <h3>Valutazioni ricevute</h3>
-            <span className="supplier-documents-count">{evalAggregate?.activeEvaluations ?? 0} valutazioni</span>
-          </div>
-          {evalAggregate && evalAggregate.activeEvaluations > 0 ? (
-            <div className="supplier-evaluation-grid">
-              {/* Score summary card */}
-              <div className="supplier-evaluation-card supplier-evaluation-summary">
-                <div className="supplier-evaluation-score">
-                  <div className="supplier-evaluation-number">
-                    {evalAggregate.averageOverallScore.toFixed(1)}
-                  </div>
-                  <div className="supplier-evaluation-stars">
-                    <Stars rating={evalAggregate.averageOverallScore} />
-                  </div>
-                </div>
-                <div className="supplier-evaluation-copy">
-                  <div className="supplier-evaluation-title">Punteggio medio</div>
-                  <div className="supplier-evaluation-kpi">
-                    <span>{evalAggregate.activeEvaluations}</span>
-                    <strong>valutazion{evalAggregate.activeEvaluations === 1 ? "e" : "i"} ricevut{evalAggregate.activeEvaluations === 1 ? "a" : "e"}</strong>
-                  </div>
-                  {evalAggregate.totalEvaluations > evalAggregate.activeEvaluations && (
-                    <div className="supplier-evaluation-note">
-                      {evalAggregate.totalEvaluations - evalAggregate.activeEvaluations} annullat{evalAggregate.totalEvaluations - evalAggregate.activeEvaluations === 1 ? "a" : "e"}
-                    </div>
-                  )}
-                  <div className="supplier-evaluation-note">
-                    Le valutazioni sono assegnate dai responsabili del Gruppo Solco dopo ogni collaborazione.
-                  </div>
-                </div>
-              </div>
-
-              {/* Category averages */}
-              <div className="supplier-evaluation-card supplier-evaluation-categories">
-                <div className="supplier-evaluation-title">Medie per categoria</div>
-                {Object.keys(evalAggregate.dimensionAverages ?? {}).length > 0 ? (
-                  <div className="supplier-category-list">
-                    {Object.entries(evalAggregate.dimensionAverages).map(([key, value]) => (
-                      <div key={key} className="supplier-category-row">
-                        <span>{EVALUATION_CATEGORY_LABELS[key] ?? key}</span>
-                        <div className="supplier-category-track">
-                          <div style={{ width: `${Math.max(0, Math.min(100, (value / 5) * 100))}%` }} />
-                        </div>
-                        <strong>{value.toFixed(1)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="supplier-evaluation-note">Le medie per categoria saranno disponibili con le prossime valutazioni dettagliate.</div>
-                )}
-              </div>
-
-              {/* Score bar visual */}
-              <div className="supplier-evaluation-card supplier-evaluation-distribution">
-                <div className="supplier-evaluation-title">Distribuzione punteggio</div>
-                {[5, 4, 3, 2, 1].map(star => {
-                  const distribution = evalAggregate.scoreDistribution ?? {};
-                  const maxCount = Math.max(1, ...[1, 2, 3, 4, 5].map(score => distribution[String(score)] ?? 0));
-                  const count = distribution[String(star)] ?? 0;
-                  const pct = Math.round((count / maxCount) * 100);
-                  return (
-                    <div key={star} className="supplier-score-row">
-                      <span>{star}</span>
-                      <Star size={11} fill="#f59e0b" color="#f59e0b" />
-                      <div className="supplier-score-track">
-                        <div style={{ width: `${pct}%` }} />
-                      </div>
-                      <strong>{count}</strong>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="supplier-empty-state-card">
-              <div className="supplier-empty-state-icon is-rating">
-                <Star size={22} />
-              </div>
-              <div>
-                <div className="supplier-empty-state-title">Nessuna valutazione ancora</div>
-                <div className="supplier-empty-state-text">Le valutazioni appariranno qui dopo le prime collaborazioni con il Gruppo Solco.</div>
-              </div>
             </div>
           )}
         </div>
@@ -2019,18 +1902,20 @@ export function RevampSupplierDashboardPage() {
               )}
             </div>
 
-            {/* S4 — Disponibilità */}
+            {/* S4 — Competenze */}
             <div className="revamp-pdf-section">
-              <div className="revamp-pdf-section-title">Sezione 4 — Disponibilità e Allegati</div>
+              <div className="revamp-pdf-section-title">Sezione 4 — Competenze</div>
               {isDocente ? (
                 <>
-                  <div className="revamp-pdf-row"><span className="revamp-pdf-label">Disponibilità trasferte</span><span className="revamp-pdf-value">{DISPONIBILITA_LABELS[g4("disponibilita")] || g4("disponibilita") || "—"}</span></div>
+                  <div className="revamp-pdf-row"><span className="revamp-pdf-label">Docenza PA</span><span className="revamp-pdf-value">{DOCENZA_PA_LABELS[g3("docenzaPA")] || g3("docenzaPA") || "—"}</span></div>
                   {espCount > 0 && <div className="revamp-pdf-row"><span className="revamp-pdf-label">Esperienze dichiarate</span><span className="revamp-pdf-value">{espCount}</span></div>}
                 </>
               ) : (
-                <div className="revamp-pdf-row"><span className="revamp-pdf-label">Area territoriale</span><span className="revamp-pdf-value">{g4("areaTerrB") || "—"}</span></div>
+                <>
+                  <div className="revamp-pdf-row"><span className="revamp-pdf-label">Anni di esperienza</span><span className="revamp-pdf-value">{g3("anniEsp") || g3("experienceBand") || "—"}</span></div>
+                  <div className="revamp-pdf-row"><span className="revamp-pdf-label">Ordine professionale</span><span className="revamp-pdf-value">{g3("ordine") || g3("professionalOrder") || "—"}</span></div>
+                </>
               )}
-              {g4("cvName") && <div className="revamp-pdf-row"><span className="revamp-pdf-label">CV allegato</span><span className="revamp-pdf-value">{g4("cvName")}</span></div>}
             </div>
 
             {/* S5 — Dichiarazioni */}

@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 @Component
 public class RevampSectionPayloadValidator {
 
-    private static final Set<String> SECTION_KEYS_ALBO_A = Set.of("S1", "S2", "S3A", "S3B", "S4", "S5");
+    private static final Set<String> SECTION_KEYS_ALBO_A = Set.of("S1", "S2", "S3", "S4A", "S5");
     private static final Set<String> SECTION_KEYS_ALBO_B = Set.of("S1", "S2", "S3", "S4", "S5");
     private static final java.util.regex.Pattern ATECO_CODE_PATTERN =
             java.util.regex.Pattern.compile("^\\d{2}(?:\\.\\d{1,2})?(?:\\.\\d{1,2})?$");
@@ -64,6 +64,10 @@ public class RevampSectionPayloadValidator {
     }
 
     private void validateAlboA(String sectionKey, ObjectNode payload, boolean completed, Supplier<Optional<JsonNode>> latestS3ASupplier) {
+        if (sectionKey.startsWith("S4B_")) {
+            if (completed) validateAlboAS4BRole(payload);
+            return;
+        }
         switch (sectionKey) {
             case "S1" -> {
                 String vatNum = extractText(payload, "vatNumber");
@@ -89,17 +93,13 @@ public class RevampSectionPayloadValidator {
                 requireAnyNonBlank(payload, "email");
             }
             case "S2" -> validateAlboAS2(payload, completed);
-            case "S3A" -> {
+            case "S3" -> validateAlboAS3(payload, completed);
+            case "S4A" -> {
                 if (!completed) break;
                 requireAnyNonBlank(payload, "thematicAreasCsv", "competencies");
                 requireAnyNonBlank(payload, "yearsExperience", "presentation", "education");
                 validateS3ACollections(payload);
             }
-            case "S3B" -> {
-                if (!completed) break;
-                validateAlboAS3B(payload);
-            }
-            case "S4" -> validateAlboAS4(payload, completed);
             case "S5" -> validateAlboAS5(payload, completed, latestS3ASupplier);
             default -> throw new IllegalArgumentException("Unsupported section key for ALBO_A: " + sectionKey);
         }
@@ -119,33 +119,40 @@ public class RevampSectionPayloadValidator {
     }
 
     private void validateAlboAS2(ObjectNode payload, boolean completed) {
-        String professionalTypeRaw = extractText(payload, "professionalType");
-        if (completed && (professionalTypeRaw == null || professionalTypeRaw.isBlank())) {
-            throw new IllegalArgumentException("S2 professionalType is required");
+        if (!completed) return;
+        requireAnyNonBlank(payload, "titoloStudio");
+        requireAnyNonBlank(payload, "annoConseg");
+        Set<String> types = extractAndValidateAttachmentTypes(payload);
+        if (!types.contains("CV")) {
+            throw new IllegalArgumentException("S2 requires CV attachment metadata");
         }
+    }
+
+    private void validateAlboAS3(ObjectNode payload, boolean completed) {
+        String atecoCode = extractText(payload, "atecoCode");
+        if (!isBlank(atecoCode)) {
+            validateAtecoField(payload, "atecoCode", false);
+        }
+        String professionalTypeRaw = extractText(payload, "professionalType");
         if (!isBlank(professionalTypeRaw)) {
             String professionalType = normalizeProfessionalType(professionalTypeRaw);
             payload.put("professionalType", professionalType);
             if (!PROFESSIONAL_TYPE_VALUES.contains(professionalType)) {
-                throw new IllegalArgumentException("S2 professionalType is invalid: " + professionalTypeRaw);
+                throw new IllegalArgumentException("S3 professionalType is invalid: " + professionalTypeRaw);
             }
-            if ("ALTRO".equals(professionalType) && completed && isBlank(extractText(payload, "atecoCode"))) {
-                throw new IllegalArgumentException("S2 atecoCode is required when professionalType is ALTRO");
-            }
-            validateAtecoField(payload, "atecoCode", false);
         }
-
         JsonNode secondary = payload.path("secondaryProfessionalTypes");
         if (secondary.isArray()) {
-            ArrayNode arr = (ArrayNode) secondary;
-            for (JsonNode value : arr) {
+            for (JsonNode value : secondary) {
                 String item = normalizeProfessionalType(value.asText(""));
                 if (item.isBlank()) continue;
                 if (!PROFESSIONAL_TYPE_VALUES.contains(item)) {
-                    throw new IllegalArgumentException("S2 secondaryProfessionalTypes contains invalid value: " + value.asText());
+                    throw new IllegalArgumentException("S3 secondaryProfessionalTypes contains invalid value: " + value.asText());
                 }
             }
         }
+        if (!completed) return;
+        requireAnyNonBlank(payload, "tipologia", "professionalType");
     }
 
     private void validateAlboAS5(ObjectNode payload, boolean completed, Supplier<Optional<JsonNode>> latestS3ASupplier) {
@@ -187,31 +194,19 @@ public class RevampSectionPayloadValidator {
     private void validateAlboBS4(ObjectNode payload, boolean completed) {
         if (!completed) return;
         requireAnyNonBlank(payload, "iso9001");
-        boolean hasLegacyAccreditation =
-                !isBlank(extractText(payload, "accreditationSummary"))
-                        || (payload.path("accreditations").isArray() && payload.path("accreditations").size() > 0);
-        if (!hasLegacyAccreditation) {
-            requireAnyNonBlank(payload, "accreditamentoFormazione", "accreditationTraining");
-            requireAnyNonBlank(payload, "accreditamentoServiziLavoro", "employmentServicesAccreditation");
-        }
 
         Set<String> types = extractAndValidateAttachmentTypes(payload);
         if (!types.contains("VISURA_CAMERALE")) {
             throw new IllegalArgumentException("S4 requires VISURA_CAMERALE attachment metadata");
         }
-        if (!types.contains("DURC")) {
-            throw new IllegalArgumentException("S4 requires DURC attachment metadata");
+        if (!types.contains("COMPANY_PROFILE")) {
+            throw new IllegalArgumentException("S4 requires COMPANY_PROFILE attachment metadata");
         }
         boolean certificationsDeclared =
                 "YES".equalsIgnoreCase(extractText(payload, "iso9001"))
-                        || !isBlank(extractText(payload, "accreditationSummary"))
-                        || isAffirmative(extractText(payload, "accreditamentoFormazione"))
-                        || isAffirmative(extractText(payload, "accreditamentoServiziLavoro"))
-                        || isAffirmative(extractText(payload, "accreditationTraining"))
-                        || isAffirmative(extractText(payload, "employmentServicesAccreditation"))
                         || (payload.path("accreditations").isArray() && payload.path("accreditations").size() > 0);
         if (certificationsDeclared && !types.contains("CERTIFICATION")) {
-            throw new IllegalArgumentException("S4 requires CERTIFICATION attachment metadata when accreditations are declared");
+            throw new IllegalArgumentException("S4 requires CERTIFICATION attachment metadata when certifications are declared");
         }
     }
 
@@ -227,30 +222,26 @@ public class RevampSectionPayloadValidator {
             String fileName = item.path("fileName").asText("").trim();
             String storageKey = item.path("storageKey").asText("").trim();
             if (fileName.isBlank() || storageKey.isBlank()) {
-                throw new IllegalArgumentException("S4 attachment metadata requires fileName and storageKey");
+                throw new IllegalArgumentException("Attachment metadata requires fileName and storageKey");
             }
             if ("upload-pending".equalsIgnoreCase(storageKey)) {
-                throw new IllegalArgumentException("S4 attachment metadata requires an uploaded storageKey");
+                throw new IllegalArgumentException("Attachment metadata requires an uploaded storageKey");
             }
             types.add(type);
         }
         return types;
     }
 
-    private void validateAlboAS3B(ObjectNode payload) {
-        requireAnyNonBlank(payload, "highestTitle");
-        requireAnyNonBlank(payload, "studyArea");
-        requireAnyNonBlank(payload, "experienceBand");
-        requireAnyNonBlank(payload, "services");
-        requireAnyNonBlank(payload, "hourlyRateRange");
-
-        JsonNode territory = payload.path("territory");
-        boolean hasTerritory = territory.isObject() && (
-                !territory.path("regionsCsv").asText("").isBlank()
-                        || !territory.path("provincesCsv").asText("").isBlank()
-        );
-        if (!hasTerritory) {
-            throw new IllegalArgumentException("S3B territory is required");
+    private void validateAlboAS4BRole(ObjectNode payload) {
+        requireAnyNonBlank(payload, "experienceBand", "anniEsp");
+        JsonNode services = payload.path("services");
+        if (!services.isArray() || services.size() == 0) {
+            services = payload.path("servizi");
+        }
+        boolean hasServices = services.isArray() && services.size() > 0;
+        boolean hasAltro = !isBlank(extractText(payload, "altroServ"));
+        if (!hasServices && !hasAltro) {
+            throw new IllegalArgumentException("S4B requires at least one service or altroServ description");
         }
     }
 
@@ -279,7 +270,6 @@ public class RevampSectionPayloadValidator {
         requireAnyNonBlank(payload, "companyName");
         requireAnyNonBlank(payload, "vatNumber");
         requireAnyNonBlank(payload, "reaNumber");
-        requireAnyNonBlank(payload, "cciaaProvince");
         requireAnyNonBlank(payload, "incorporationDate");
         requireAnyNonBlank(payload, "legalForm");
         requireAnyNonBlank(payload, "institutionalEmail");
@@ -291,10 +281,6 @@ public class RevampSectionPayloadValidator {
         );
         if (isBlank(legalRepName)) {
             throw new IllegalArgumentException("S1 legal representative name is required");
-        }
-        String legalRepTaxCode = payload.path("legalRepresentative").path("taxCode").asText(null);
-        if (isBlank(legalRepTaxCode)) {
-            throw new IllegalArgumentException("S1 legal representative taxCode is required");
         }
         String legalRepRole = payload.path("legalRepresentative").path("role").asText(null);
         if (isBlank(legalRepRole)) {
@@ -329,9 +315,8 @@ public class RevampSectionPayloadValidator {
         String legalCity = payload.path("legalAddress").path("city").asText(null);
         String legalCap = payload.path("legalAddress").path("cap").asText(null);
         String legalProvince = payload.path("legalAddress").path("province").asText(null);
-        String legalStato = payload.path("legalAddress").path("stato").asText(null);
-        String legalRegion = payload.path("legalAddress").path("region").asText(null);
-        if (isBlank(legalStreet) || isBlank(legalCity) || isBlank(legalCap) || isBlank(legalProvince) || isBlank(legalStato) || isBlank(legalRegion)) {
+        String legalCountry = payload.path("legalAddress").path("country").asText(null);
+        if (isBlank(legalStreet) || isBlank(legalCity) || isBlank(legalCap) || isBlank(legalProvince) || isBlank(legalCountry)) {
             throw new IllegalArgumentException("S1 legalAddress fields are required");
         }
 
@@ -465,13 +450,13 @@ public class RevampSectionPayloadValidator {
                 }
             }
             if (validCount == 0 && isBlank(extractText(payload, "thematicAreasCsv"))) {
-                throw new IllegalArgumentException("S3A requires at least one complete competency");
+                throw new IllegalArgumentException("S4A requires at least one complete competency");
             }
         }
 
         JsonNode experiencesNode = payload.path("experiences");
         if (experiencesNode.isArray() && experiencesNode.size() > 5) {
-            throw new IllegalArgumentException("S3A experiences exceed max limit (5)");
+            throw new IllegalArgumentException("S4A experiences exceed max limit (5)");
         }
     }
 
@@ -525,8 +510,13 @@ public class RevampSectionPayloadValidator {
     }
 
     private void validateSectionKeyAllowed(RegistryType registryType, String sectionKey) {
-        Set<String> allowed = registryType == RegistryType.ALBO_A ? SECTION_KEYS_ALBO_A : SECTION_KEYS_ALBO_B;
-        if (!allowed.contains(sectionKey)) {
+        if (registryType == RegistryType.ALBO_A) {
+            if (SECTION_KEYS_ALBO_A.contains(sectionKey) || sectionKey.startsWith("S4B_")) {
+                return;
+            }
+            throw new IllegalArgumentException("Section " + sectionKey + " is not valid for " + registryType);
+        }
+        if (!SECTION_KEYS_ALBO_B.contains(sectionKey)) {
             throw new IllegalArgumentException("Section " + sectionKey + " is not valid for " + registryType);
         }
     }

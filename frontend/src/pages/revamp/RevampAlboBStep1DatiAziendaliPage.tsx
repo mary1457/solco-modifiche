@@ -6,6 +6,7 @@ import { HttpError } from "../../api/http";
 import { checkRevampIdentityAvailability, createRevampApplicationDraft, deleteRevampApplicationDraft, getMyLatestRevampApplication, getRevampApplicationSections, saveRevampApplicationSection, uploadRevampAttachment, type AttachmentUploadResult } from "../../api/revampApplicationApi";
 import { clearRevampApplicationIdForRegistry, loadRevampApplicationIdForRegistry, saveRevampApplicationIdForRegistry } from "../../utils/revampApplicationSession";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodes";
+import { COUNTRIES_IT } from "../../utils/countries";
 import { clearRevampIntegrationEditSession, integrationEditHasAnyCode, isRevampIntegrationEditFor } from "../../utils/revampIntegrationEditSession";
 import { completeRevampIntegrationEdit } from "../../utils/revampIntegrationCompletion";
 import { clearRevampDocumentRenewalEditSession, isRevampDocumentRenewalEditFor, requestRevampDocumentRenewalDrawerReopen } from "../../utils/revampDocumentRenewalEditSession";
@@ -37,6 +38,17 @@ const FORME_GIURIDICHE = [
   { value: "studio_associato",label: "Studio Associato" },
   { value: "ditta_individuale",label: "Ditta Individuale" },
   { value: "altro",           label: "Altro" },
+];
+
+const RUOLI_LR = [
+  { value: "amministratore_unico",   label: "Amministratore Unico" },
+  { value: "presidente_cda",         label: "Presidente del Consiglio di Amministrazione" },
+  { value: "amministratore_delegato",label: "Amministratore Delegato" },
+  { value: "legale_rappresentante",  label: "Legale Rappresentante" },
+  { value: "presidente",             label: "Presidente" },
+  { value: "direttore_generale",     label: "Direttore Generale" },
+  { value: "socio",                  label: "Socio" },
+  { value: "altro",                  label: "Altro" },
 ];
 
 const PROVINCE_IT = [
@@ -96,28 +108,6 @@ const PROVINCE_IT = [
   { value: "VT", label: "Viterbo (VT)" },
 ];
 
-const REGIONI_IT = [
-  { value: "Abruzzo", label: "Abruzzo" },
-  { value: "Basilicata", label: "Basilicata" },
-  { value: "Calabria", label: "Calabria" },
-  { value: "Campania", label: "Campania" },
-  { value: "Emilia-Romagna", label: "Emilia-Romagna" },
-  { value: "Friuli-Venezia Giulia", label: "Friuli-Venezia Giulia" },
-  { value: "Lazio", label: "Lazio" },
-  { value: "Liguria", label: "Liguria" },
-  { value: "Lombardia", label: "Lombardia" },
-  { value: "Marche", label: "Marche" },
-  { value: "Molise", label: "Molise" },
-  { value: "Piemonte", label: "Piemonte" },
-  { value: "Puglia", label: "Puglia" },
-  { value: "Sardegna", label: "Sardegna" },
-  { value: "Sicilia", label: "Sicilia" },
-  { value: "Toscana", label: "Toscana" },
-  { value: "Trentino-Alto Adige", label: "Trentino-Alto Adige" },
-  { value: "Umbria", label: "Umbria" },
-  { value: "Valle d'Aosta", label: "Valle d'Aosta" },
-  { value: "Veneto", label: "Veneto" },
-];
 
 function splitPhoneValue(value: string | undefined, fallbackCode = "+39"): { code: string; number: string } {
   const raw = (value ?? "").trim();
@@ -134,7 +124,7 @@ function composePhoneValue(code: string, number: string): string {
   return trimmed ? `${code} ${trimmed}` : "";
 }
 
-const PIVA_RE  = /^\d{11}$/;
+const PIVA_RE  = /^IT\d{11}$/i;
 const CF_RE    = /^[A-Z]{6}\d{2}[A-EHLMPR-T]\d{2}[A-Z]\d{3}[A-Z]$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const URL_RE   = /^https?:\/\/.+\..+/;
@@ -163,6 +153,19 @@ function displayToIso(s: string): string {
   const [dd, mm, yyyy] = s.split("/");
   return `${yyyy}-${mm}-${dd}`;
 }
+function formatMonthYear(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 6);
+  if (digits.length <= 2) return digits;
+  return digits.slice(0, 2) + "/" + digits.slice(2);
+}
+
+function formatDayMonthYear(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return digits.slice(0, 2) + "/" + digits.slice(2);
+  return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+}
+
 const DUPLICATE_PIVA_ERROR = "Partita IVA gia presente. Inserisci un valore diverso.";
 
 type OnChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
@@ -382,11 +385,11 @@ export function RevampAlboBStep1DatiAziendaliPage() {
 
   const [form, setForm] = useState({
     ragioneSociale: "", formaGiuridica: "", piva: "", codiceFiscale: "",
-    rea: "", cciaa: "", dataCostituzione: "",
-    paeseLegale: "Italia", indirizzoLegale: "", comuneLegale: "", capLegale: "", provinciaLegale: "", statoLegale: "", regioneLegale: "",
+    rea: "", dataCostituzione: "",
+    paeseLegale: "IT", indirizzoLegale: "", numeroCivicoLegale: "", comuneLegale: "", provinciaLegale: "", capLegale: "",
     sedeOperativa: "",
     email: auth?.email ?? "", pec: "", telefonoCode: "+39", telefono: "", sitoWeb: "", linkedin: "",
-    lrNomeCognome: "", lrCodiceFiscale: "", lrRuolo: "", lrIdDocumentExpiry: "",
+    lrNomeCognome: "", lrRuolo: "", lrIdDocumentExpiry: "",
     refNome: "", refRuolo: "", refEmail: "", refTelefonoCode: "+39", refTelefono: "",
   });
   const [lrCartaIdentita, setLrCartaIdentita] = useState<AttachmentUploadResult | null>(null);
@@ -493,18 +496,16 @@ export function RevampAlboBStep1DatiAziendaliPage() {
         ...prev,
         ragioneSociale:   s1.ragioneSociale   ?? prev.ragioneSociale,
         formaGiuridica:   s1.formaGiuridica   ?? prev.formaGiuridica,
-        piva:             s1.piva             ?? s1.vatNumber ?? prev.piva,
+        piva:             s1.piva ?? s1.vatNumber ?? prev.piva,
         codiceFiscale:    s1.codiceFiscale    ?? prev.codiceFiscale,
         rea:              s1.rea              ?? prev.rea,
-        cciaa:            s1.cciaa            ?? prev.cciaa,
         dataCostituzione: s1.dataCostituzione ?? prev.dataCostituzione,
-        paeseLegale:      s1.paeseLegale      ?? s1.legalAddress?.country ?? prev.paeseLegale,
-        indirizzoLegale:  s1.indirizzoLegale  ?? prev.indirizzoLegale,
-        comuneLegale:     s1.comuneLegale     ?? prev.comuneLegale,
-        capLegale:        s1.capLegale        ?? prev.capLegale,
-        provinciaLegale:  s1.provinciaLegale  ?? prev.provinciaLegale,
-        statoLegale:      s1.statoLegale      ?? prev.statoLegale,
-        regioneLegale:    s1.regioneLegale    ?? prev.regioneLegale,
+        paeseLegale:         s1.paeseLegale         ?? s1.legalAddress?.country    ?? prev.paeseLegale,
+        indirizzoLegale:     s1.indirizzoLegale     ?? s1.legalAddress?.street    ?? prev.indirizzoLegale,
+        numeroCivicoLegale:  s1.numeroCivicoLegale  ?? s1.legalAddress?.streetNumber ?? prev.numeroCivicoLegale,
+        comuneLegale:        s1.comuneLegale        ?? s1.legalAddress?.city       ?? prev.comuneLegale,
+        provinciaLegale:     s1.provinciaLegale     ?? s1.legalAddress?.province   ?? prev.provinciaLegale,
+        capLegale:           s1.capLegale           ?? s1.legalAddress?.cap        ?? prev.capLegale,
         sedeOperativa:    s1.sedeOperativa    ?? prev.sedeOperativa,
         email:            s1.email            ?? prev.email,
         pec:              s1.pec              ?? prev.pec,
@@ -513,7 +514,6 @@ export function RevampAlboBStep1DatiAziendaliPage() {
         sitoWeb:          s1.sitoWeb          ?? prev.sitoWeb,
         linkedin:         s1.linkedin         ?? prev.linkedin,
         lrNomeCognome:       s1.lrNomeCognome    ?? prev.lrNomeCognome,
-        lrCodiceFiscale:     s1.lrCodiceFiscale  ?? prev.lrCodiceFiscale,
         lrRuolo:             s1.lrRuolo          ?? prev.lrRuolo,
         lrIdDocumentExpiry:  s1.lrIdDocumentExpiry ?? (s1.legalRepresentative as any)?.idDocumentExpiry ?? prev.lrIdDocumentExpiry,
         refNome:          s1.refNome          ?? prev.refNome,
@@ -568,19 +568,18 @@ export function RevampAlboBStep1DatiAziendaliPage() {
     if (!form.ragioneSociale.trim()) e.ragioneSociale = "Campo obbligatorio.";
     if (!form.formaGiuridica) e.formaGiuridica = "Campo obbligatorio.";
     if (!form.piva.trim()) { e.piva = "Campo obbligatorio."; }
-    else if (!PIVA_RE.test(form.piva.trim())) { e.piva = "Deve contenere esattamente 11 cifre."; }
+    else if (!PIVA_RE.test(form.piva.trim())) { e.piva = "Formato non valido (es. IT12345678901)."; }
     if (form.codiceFiscale.trim() && !CF_RE.test(form.codiceFiscale.trim())) { e.codiceFiscale = "Formato non valido (16 caratteri alfanumerici)."; }
     if (!form.rea.trim()) { e.rea = "Campo obbligatorio."; }
     else if (!REA_RE.test(form.rea.trim())) { e.rea = "Formato non valido. Es. MI-1234567"; }
-    if (!form.cciaa) e.cciaa = "Campo obbligatorio.";
     if (!form.dataCostituzione.trim()) { e.dataCostituzione = "Campo obbligatorio."; }
     else if (!MY_RE.test(form.dataCostituzione.trim())) { e.dataCostituzione = "Formato non valido. Usa MM/AAAA."; }
     if (!form.paeseLegale.trim()) e.paeseLegale = "Campo obbligatorio.";
     if (!form.indirizzoLegale.trim()) e.indirizzoLegale = "Campo obbligatorio.";
+    if (!form.numeroCivicoLegale.trim()) e.numeroCivicoLegale = "Campo obbligatorio.";
     if (!form.comuneLegale.trim()) e.comuneLegale = "Campo obbligatorio.";
-    if (!form.capLegale.trim()) e.capLegale = "Campo obbligatorio.";
     if (!form.provinciaLegale.trim()) e.provinciaLegale = "Campo obbligatorio.";
-    if (!form.regioneLegale.trim()) e.regioneLegale = "Campo obbligatorio.";
+    if (!form.capLegale.trim()) e.capLegale = "Campo obbligatorio.";
     if (!form.email.trim()) { e.email = "Campo obbligatorio."; }
     else if (!EMAIL_RE.test(form.email.trim())) { e.email = "Indirizzo email non valido."; }
     if (!form.pec.trim()) { e.pec = "Campo obbligatorio."; }
@@ -590,8 +589,6 @@ export function RevampAlboBStep1DatiAziendaliPage() {
     if (form.linkedin.trim() && !URL_RE.test(form.linkedin.trim())) e.linkedin = "Inserisci un URL valido (es. https://www.linkedin.com/company/...).";
 
     if (!form.lrNomeCognome.trim()) e.lrNomeCognome = "Campo obbligatorio.";
-    if (!form.lrCodiceFiscale.trim()) { e.lrCodiceFiscale = "Campo obbligatorio."; }
-    else if (!CF_RE.test(form.lrCodiceFiscale.trim())) { e.lrCodiceFiscale = "Formato codice fiscale non valido."; }
     if (!form.lrRuolo.trim()) e.lrRuolo = "Campo obbligatorio.";
     if (!form.lrIdDocumentExpiry.trim()) { e.lrIdDocumentExpiry = "Campo obbligatorio."; }
     else if (!isValidDate(form.lrIdDocumentExpiry.trim())) { e.lrIdDocumentExpiry = "Data non valida. Usa il formato GG/MM/AAAA."; }
@@ -682,7 +679,6 @@ export function RevampAlboBStep1DatiAziendaliPage() {
       companyName:        form.ragioneSociale,
       vatNumber:          form.piva,
       reaNumber:          form.rea,
-      cciaaProvince:      form.cciaa,
       incorporationDate:  form.dataCostituzione,
       legalForm:          FORMA_TO_BACKEND[form.formaGiuridica] ?? "ALTRO",
       institutionalEmail: form.email || form.pec,
@@ -690,7 +686,6 @@ export function RevampAlboBStep1DatiAziendaliPage() {
       linkedin:           form.linkedin || undefined,
       legalRepresentative: {
         name:                 form.lrNomeCognome,
-        taxCode:              form.lrCodiceFiscale,
         role:                 form.lrRuolo,
         idDocumentExpiry:     displayToIso(form.lrIdDocumentExpiry),
         idDocumentAttachment: lrCartaIdentita ?? undefined,
@@ -701,13 +696,12 @@ export function RevampAlboBStep1DatiAziendaliPage() {
         phone: composePhoneValue(form.refTelefonoCode, form.refTelefono),
       },
       legalAddress: {
-        country:  form.paeseLegale,
-        street:   form.indirizzoLegale,
-        city:     form.comuneLegale,
-        cap:      form.capLegale,
-        province: form.provinciaLegale,
-        stato:    form.statoLegale,
-        region:   form.regioneLegale,
+        country:      form.paeseLegale,
+        street:       form.indirizzoLegale,
+        streetNumber: form.numeroCivicoLegale,
+        city:         form.comuneLegale,
+        province:     form.provinciaLegale,
+        cap:          form.capLegale,
       },
     };
   }
@@ -731,7 +725,7 @@ export function RevampAlboBStep1DatiAziendaliPage() {
         const appId = await getOrCreateAlboBApplicationId();
         const apiPayload = buildApiPayload();
         if (!integrationIdentityOnly) {
-          const availability = await checkRevampIdentityAvailability(appId, "vatNumber", form.piva, auth.token);
+          const availability = await checkRevampIdentityAvailability(appId, "vatNumber", form.piva.trim(), auth.token);
           if (!availability.available) {
             setErrors((prev) => ({ ...prev, piva: DUPLICATE_PIVA_ERROR }));
             return;
@@ -817,31 +811,66 @@ export function RevampAlboBStep1DatiAziendaliPage() {
             </fieldset>
             <fieldset disabled={integrationIdentityOnly || fcrLocked("identificativi")} className={integrationIdentityOnly ? "fcr-locked" : fcrGroupClass("identificativi")}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-              <Field label="Partita IVA" required value={form.piva} onChange={set("piva")} error={errors.piva} placeholder="12345678901" errorTooltip={errors.piva === DUPLICATE_PIVA_ERROR} />
+              <Field
+                label="Partita IVA"
+                required
+                value={form.piva}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setForm(prev => ({ ...prev, piva: val }));
+                  if (errors.piva && errors.piva !== DUPLICATE_PIVA_ERROR) setErrors(prev => { const n = { ...prev }; delete n.piva; return n; });
+                }}
+                onBlur={() => {
+                  const v = form.piva.trim();
+                  if (!v) return;
+                  if (!PIVA_RE.test(v)) {
+                    setErrors(prev => ({ ...prev, piva: "Formato non valido (es. IT12345678901)." }));
+                  } else {
+                    setErrors(prev => { const n = { ...prev }; delete n.piva; return n; });
+                  }
+                }}
+                error={errors.piva}
+                placeholder="IT12345678901"
+                errorTooltip={errors.piva === DUPLICATE_PIVA_ERROR}
+              />
               <Field label="Codice Fiscale" value={form.codiceFiscale} onChange={set("codiceFiscale")} error={errors.codiceFiscale} placeholder="Se diverso dalla P.IVA" hintText="opzionale" />
               <Field label="Numero REA" required value={form.rea} onChange={set("rea")} error={errors.rea} placeholder="MI-1234567" hintText="es. MI-1234567" />
-              <SelectField label="CCIAA di iscrizione" required value={form.cciaa} onChange={set("cciaa")} error={errors.cciaa} options={PROVINCE_IT} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 3fr", gap: 16, marginBottom: 16 }}>
-              <Field label="Data di costituzione" required value={form.dataCostituzione} onChange={set("dataCostituzione")} error={errors.dataCostituzione} placeholder="MM/AAAA" hintText="mese/anno" />
+              <Field
+                label="Data di costituzione"
+                required
+                value={form.dataCostituzione}
+                onChange={(e) => {
+                  setForm(prev => ({ ...prev, dataCostituzione: formatMonthYear(e.target.value) }));
+                  setErrors(prev => { const n = { ...prev }; delete n.dataCostituzione; return n; });
+                }}
+                onBlur={() => {
+                  const v = form.dataCostituzione.trim();
+                  if (!v) return;
+                  if (!MY_RE.test(v)) {
+                    setErrors(p => ({ ...p, dataCostituzione: "Formato non valido. Usa MM/AAAA." }));
+                  } else {
+                    setErrors(p => { const n = { ...p }; delete n.dataCostituzione; return n; });
+                  }
+                }}
+                error={errors.dataCostituzione}
+                placeholder="MM/AAAA"
+                hintText="mese/anno"
+              />
             </div>
             </fieldset>
 
             {/* Sede legale */}
             <SectionLabel label="Sede legale" />
             <fieldset disabled={integrationIdentityOnly || fcrLocked("sede_legale")} className={integrationIdentityOnly ? "fcr-locked" : fcrGroupClass("sede_legale")}>
-            <div style={{ display: "grid", gridTemplateColumns: "0.9fr 2fr", gap: 16, marginBottom: 12 }}>
-              <Field label="Paese" required value={form.paeseLegale} onChange={set("paeseLegale")} error={errors.paeseLegale} placeholder="Italia" />
-              <Field label="Indirizzo" required value={form.indirizzoLegale} onChange={set("indirizzoLegale")} error={errors.indirizzoLegale} placeholder="Via Roma, 1" />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.8fr", gap: 16, marginBottom: 12 }}>
-              <Field label="Citta / Comune" required value={form.comuneLegale} onChange={set("comuneLegale")} error={errors.comuneLegale} placeholder="Milano" />
-              <Field label="Codice postale" required value={form.capLegale} onChange={set("capLegale")} error={errors.capLegale} placeholder="20121" />
+            <div style={{ display: "grid", gridTemplateColumns: "0.9fr 2fr 0.9fr", gap: 16, marginBottom: 12 }}>
+              <SelectField label="Paese" required value={form.paeseLegale} onChange={set("paeseLegale")} error={errors.paeseLegale} options={COUNTRIES_IT} />
+              <Field label="Via" required value={form.indirizzoLegale} onChange={set("indirizzoLegale")} error={errors.indirizzoLegale} placeholder="Via Dante" />
+              <Field label="Numero civico" required value={form.numeroCivicoLegale} onChange={set("numeroCivicoLegale")} error={errors.numeroCivicoLegale} placeholder="14/A" />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <Field label="Città" required value={form.comuneLegale} onChange={set("comuneLegale")} error={errors.comuneLegale} placeholder="Milano" />
               <SelectField label="Provincia" required value={form.provinciaLegale} onChange={set("provinciaLegale")} error={errors.provinciaLegale} options={PROVINCE_IT} />
-              <Field label="Stato" required value={form.statoLegale} onChange={set("statoLegale")} error={errors.statoLegale} placeholder="Italia" />
-              <SelectField label="Regione" required value={form.regioneLegale} onChange={set("regioneLegale")} error={errors.regioneLegale} options={REGIONI_IT} />
+              <Field label="CAP" required value={form.capLegale} onChange={set("capLegale")} error={errors.capLegale} placeholder="20121" />
             </div>
             </fieldset>
             <fieldset disabled={integrationIdentityOnly || fcrLocked("sede_operativa")} className={integrationIdentityOnly ? "fcr-locked" : fcrGroupClass("sede_operativa")}>
@@ -868,10 +897,9 @@ export function RevampAlboBStep1DatiAziendaliPage() {
             {/* Legale rappresentante */}
             <SectionLabel label="Legale rappresentante" />
             <fieldset disabled={integrationIdentityOnly || fcrLocked("leg_rappr")} className={integrationIdentityOnly ? "fcr-locked" : fcrGroupClass("leg_rappr")}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <Field label="Nome e Cognome" required value={form.lrNomeCognome} onChange={set("lrNomeCognome")} error={errors.lrNomeCognome} placeholder="Mario Rossi" />
-              <Field label="Codice Fiscale" required value={form.lrCodiceFiscale} onChange={set("lrCodiceFiscale")} error={errors.lrCodiceFiscale} placeholder="RSSMRA80C15F205X" />
-              <Field label="Ruolo / Carica" required value={form.lrRuolo} onChange={set("lrRuolo")} error={errors.lrRuolo} placeholder="Es. Amministratore Unico, Presidente CdA" />
+              <SelectField label="Ruolo / Carica" required value={form.lrRuolo} onChange={set("lrRuolo")} error={errors.lrRuolo} options={RUOLI_LR} />
             </div>
             </fieldset>
             <fieldset disabled={!integrationIdentityOnly && fcrLocked("leg_rappr")} className={integrationIdentityOnly ? "fcr-active-group" : fcrGroupClass("leg_rappr")}>
@@ -894,7 +922,10 @@ export function RevampAlboBStep1DatiAziendaliPage() {
                 label="Data di scadenza"
                 required
                 value={form.lrIdDocumentExpiry}
-                onChange={set("lrIdDocumentExpiry")}
+                onChange={(e) => {
+                  setForm(prev => ({ ...prev, lrIdDocumentExpiry: formatDayMonthYear(e.target.value) }));
+                  setErrors(prev => { const n = { ...prev }; delete n.lrIdDocumentExpiry; return n; });
+                }}
                 error={errors.lrIdDocumentExpiry}
                 placeholder="GG/MM/AAAA"
                 hintText="giorno/mese/anno"

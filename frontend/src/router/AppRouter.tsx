@@ -161,6 +161,11 @@ function RequireAdminGovernanceRoles({
   return children;
 }
 
+function RevampStep4RoleKeyWrapper() {
+  const { roleSlug } = useParams();
+  return <RevampStep4DisponibilitaPage key={roleSlug} />;
+}
+
 export function AppRouter() {
   const { auth } = useAuth();
   const authenticatedHome = auth ? (auth.role === "SUPPLIER" ? "/supplier/dashboard" : "/admin/dashboard") : "/";
@@ -288,6 +293,16 @@ export function AppRouter() {
               <RequireAuth allowedRoles={["SUPPLIER"]}>
                 <RequireRevampOtpForSupplier>
                   <RevampStep3CompetenzePage />
+                </RequireRevampOtpForSupplier>
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/apply/:registryType/step/4/:roleSlug"
+            element={(
+              <RequireAuth allowedRoles={["SUPPLIER"]}>
+                <RequireRevampOtpForSupplier>
+                  <RevampStep4RoleKeyWrapper />
                 </RequireRevampOtpForSupplier>
               </RequireAuth>
             )}

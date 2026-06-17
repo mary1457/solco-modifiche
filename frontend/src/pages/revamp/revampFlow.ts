@@ -24,6 +24,20 @@ export function areRequiredSectionsComplete(
   return getMissingRequiredSections(registryType, sections).length === 0;
 }
 
+function getAllStep4Keys(sections: RevampSectionSnapshot[]): string[] {
+  const s3 = sections.find((s) => s.sectionKey === "S3");
+  if (!s3?.payloadJson) return ["S4B"];
+  try {
+    const payload = JSON.parse(s3.payloadJson) as { tipologia?: string; multiRuoli?: string[] };
+    const mainRole = payload.tipologia;
+    if (!mainRole) return ["S4B"];
+    const secondaryRoles = payload.multiRuoli ?? [];
+    return [mainRole, ...secondaryRoles].map((role) => role === "docente" ? "S4A" : `S4B_${role}`);
+  } catch {
+    return ["S4B"];
+  }
+}
+
 export function getMissingRequiredSections(
   registryType: string,
   sections: RevampSectionSnapshot[]
@@ -31,8 +45,14 @@ export function getMissingRequiredSections(
   const completed = new Set(
     sections.filter((section) => section.completed).map((section) => section.sectionKey)
   );
+  if (registryType === "ALBO_A") {
+    const step4Keys = getAllStep4Keys(sections);
+    const required = ["S1", "S2", "S3", ...step4Keys, "S5"];
+    return required.filter((sectionKey) => !completed.has(sectionKey));
+  }
   const section3Key = resolveSection3Key(registryType, sections);
-  return ["S1", "S2", section3Key, "S4", "S5"].filter((sectionKey) => !completed.has(sectionKey));
+  const required = ["S1", "S2", section3Key, "S4", "S5"];
+  return required.filter((sectionKey) => !completed.has(sectionKey));
 }
 
 function isCompleted(sectionKey: string, sections: RevampSectionSnapshot[]): boolean {

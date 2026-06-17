@@ -27,7 +27,7 @@ type CertRecord = {
   fileName: string;
   attachment?: AttachmentUploadResult | null;
 };
-type AttachmentDocumentType = "VISURA_CAMERALE" | "DURC" | "COMPANY_PROFILE" | "CERTIFICATION";
+type AttachmentDocumentType = "VISURA_CAMERALE" | "COMPANY_PROFILE" | "CERTIFICATION";
 
 const CERTS_ISO: { key: string; label: string; desc: string }[] = [
   { key: "iso9001",  label: "ISO 9001 — Qualità", desc: "Sistema di gestione per la qualità" },
@@ -53,6 +53,12 @@ function validateScadenzaField(val: string): string {
   if (!MY_RE.test(val.trim())) return "Formato MM/AAAA non valido.";
   if (!isNotPastMonth(val.trim())) return "La scadenza non può essere nel passato.";
   return "";
+}
+
+function formatScadenzaInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 6);
+  if (digits.length <= 2) return digits;
+  return digits.slice(0, 2) + "/" + digits.slice(2);
 }
 
 const col: React.CSSProperties    = { display: "flex", flexDirection: "column", gap: 4 };
@@ -163,7 +169,6 @@ export function RevampAlboBStep4CertificazioniPage() {
     .filter(item => item.documentType === "CERTIFICATION" && item.certificationKey)
     .map(item => item.certificationKey as string);
   const allowVisura = !lockedEdit || integrationEditHasAnyCode(integrationEdit, ["VISURA_CAMERALE"]) || renewalHasDocumentType("VISURA_CAMERALE");
-  const allowDurc = !lockedEdit || integrationEditHasAnyCode(integrationEdit, ["DURC"]) || renewalHasDocumentType("DURC");
   const allowCompanyProfile = !lockedEdit || integrationEditHasAnyCode(integrationEdit, ["COMPANY_PROFILE"]) || renewalHasDocumentType("COMPANY_PROFILE");
   const allowCertAttachments = !lockedEdit || integrationEditHasAnyCode(integrationEdit, [
     "CERT_ISO_9001",
@@ -178,28 +183,17 @@ export function RevampAlboBStep4CertificazioniPage() {
     if (!allowCertAttachments) return false;
     return requestedRenewalCertKeys.length === 0 || requestedRenewalCertKeys.includes(key);
   };
-  const allowGenericCertAttachment = !renewalEdit || requestedRenewalCertKeys.length === 0;
-
   const [certs, setCerts] = useState<Record<string, CertRecord>>(
     Object.fromEntries(CERTS_ISO.map(c => [c.key, { presente: "", enteCertificatore: "", scadenza: "", fileName: "" }]))
   );
   const [altreCert,    setAltreCert]    = useState("");
-  const [accFormazione, setAccFormazione] = useState<"si" | "no" | "">("");
-  const [accRegioni,   setAccRegioni]   = useState("");
-  const [accTipo,      setAccTipo]      = useState("");
-  const [accLavoro,    setAccLavoro]    = useState<"si" | "no" | "">("");
 
   // Allegati
   const [visura,         setVisura]         = useState("");
   const [visuraScadenza, setVisuraScadenza] = useState("");
   const [companyProf,    setCompanyProf]    = useState("");
-  const [durc,           setDurc]           = useState("");
-  const [durcScadenza,   setDurcScadenza]   = useState("");
-  const [certAlleg,   setCertAlleg]   = useState("");
   const [visuraAttachment, setVisuraAttachment] = useState<AttachmentUploadResult | null>(null);
   const [companyProfAttachment, setCompanyProfAttachment] = useState<AttachmentUploadResult | null>(null);
-  const [durcAttachment, setDurcAttachment] = useState<AttachmentUploadResult | null>(null);
-  const [certAllegAttachment, setCertAllegAttachment] = useState<AttachmentUploadResult | null>(null);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
   const [triedSubmit,   setTriedSubmit]   = useState(false);
@@ -228,10 +222,6 @@ export function RevampAlboBStep4CertificazioniPage() {
         });
       }
       if (s4.altreCertificazioni !== undefined) setAltreCert(s4.altreCertificazioni as string);
-      if (s4.accreditamentoFormazione)          setAccFormazione(s4.accreditamentoFormazione as "si" | "no");
-      if (s4.accreditamentoRegioni)             setAccRegioni(s4.accreditamentoRegioni as string);
-      if (s4.accreditamentoTipoFormazione)      setAccTipo(s4.accreditamentoTipoFormazione as string);
-      if (s4.accreditamentoServiziLavoro)       setAccLavoro(s4.accreditamentoServiziLavoro as "si" | "no");
       if (Array.isArray(s4.attachments)) {
         type AttMeta = {
           documentType: string;
@@ -254,10 +244,6 @@ export function RevampAlboBStep4CertificazioniPage() {
             setVisura(att.fileName);
             setVisuraAttachment(result);
             if (att.scadenza) setVisuraScadenza(att.scadenza);
-          } else if (att.documentType === "DURC") {
-            setDurc(att.fileName);
-            setDurcAttachment(result);
-            if (att.scadenza) setDurcScadenza(att.scadenza);
           } else if (att.documentType === "COMPANY_PROFILE") {
             setCompanyProf(att.fileName);
             setCompanyProfAttachment(result);
@@ -271,9 +257,6 @@ export function RevampAlboBStep4CertificazioniPage() {
                   attachment: result
                 }
               }));
-            } else {
-              setCertAlleg(att.fileName);
-              setCertAllegAttachment(result);
             }
           }
         }
@@ -297,7 +280,7 @@ export function RevampAlboBStep4CertificazioniPage() {
     if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
     const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
     return () => clearTimeout(timer);
-  }, [certs, altreCert, accFormazione, accRegioni, accTipo, accLavoro, visura, visuraScadenza, companyProf, durc, durcScadenza, certAlleg]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [certs, altreCert, visura, visuraScadenza, companyProf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function updateCert(key: string, field: keyof CertRecord, value: string) {
     setCerts(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
@@ -406,7 +389,6 @@ export function RevampAlboBStep4CertificazioniPage() {
       certificationLabel?: string;
     }> = [];
     if (visuraAttachment) attachments.push({ documentType: "VISURA_CAMERALE", scadenza: visuraScadenza || undefined, ...visuraAttachment });
-    if (durcAttachment) attachments.push({ documentType: "DURC", scadenza: durcScadenza || undefined, ...durcAttachment });
     if (companyProfAttachment) attachments.push({ documentType: "COMPANY_PROFILE", ...companyProfAttachment });
     for (const cert of CERTS_ISO) {
       const certRecord = certs[cert.key];
@@ -421,7 +403,6 @@ export function RevampAlboBStep4CertificazioniPage() {
         });
       }
     }
-    if (certAllegAttachment) attachments.push({ documentType: "CERTIFICATION", ...certAllegAttachment });
     return attachments;
   }
 
@@ -431,10 +412,6 @@ export function RevampAlboBStep4CertificazioniPage() {
       if (allowVisura) {
         if (!visuraAttachment) e.visura = "La visura camerale è obbligatoria.";
         if (visuraAttachment && !visuraScadenza.trim()) e.visuraScadenza = "Inserisci la scadenza della visura.";
-      }
-      if (allowDurc) {
-        if (!durcAttachment) e.durc = "Il DURC è obbligatorio.";
-        if (durcAttachment && !durcScadenza.trim()) e.durcScadenza = "Inserisci la scadenza del DURC.";
       }
       if (allowCompanyProfile && !companyProfAttachment) e.companyProf = "Carica il company profile richiesto.";
       if (allowCertAttachments) {
@@ -455,7 +432,7 @@ export function RevampAlboBStep4CertificazioniPage() {
             }
           }
         } else {
-          const hasRequestedCert = Boolean(certAllegAttachment) || CERTS_ISO.some((cert) => certs[cert.key]?.attachment);
+          const hasRequestedCert = CERTS_ISO.some((cert) => certs[cert.key]?.attachment);
           if (!hasRequestedCert) e.certAlleg = "Carica il certificato richiesto.";
         }
       }
@@ -472,23 +449,13 @@ export function RevampAlboBStep4CertificazioniPage() {
         if (!rec.attachment) e[`cert_${c.key}_file`] = "Allega il certificato PDF.";
       }
     }
-    if (!accFormazione) e.accFormazione = "Campo obbligatorio.";
-    if (!accLavoro)     e.accLavoro     = "Campo obbligatorio.";
     if (!visuraAttachment)  e.visura = "La visura camerale è obbligatoria.";
     if (visuraAttachment) {
       if (!visuraScadenza.trim()) e.visuraScadenza = "Inserisci la scadenza della visura.";
       else if (!MY_RE.test(visuraScadenza.trim())) e.visuraScadenza = "Formato MM/AAAA non valido.";
       else if (!isNotPastMonth(visuraScadenza.trim())) e.visuraScadenza = "La scadenza non può essere nel passato.";
     }
-    if (!durcAttachment)    e.durc   = "Il DURC è obbligatorio.";
-    if (durcAttachment) {
-      if (!durcScadenza.trim()) e.durcScadenza = "Inserisci la scadenza del DURC.";
-      else if (!MY_RE.test(durcScadenza.trim())) e.durcScadenza = "Formato MM/AAAA non valido.";
-      else if (!isNotPastMonth(durcScadenza.trim())) e.durcScadenza = "La scadenza non può essere nel passato.";
-    }
-    if ((altreCert.trim().length > 0 || accFormazione === "si" || accLavoro === "si") && !certAllegAttachment) {
-      e.certAlleg = "Allega i certificati o accreditamenti dichiarati.";
-    }
+    if (!companyProfAttachment) e.companyProf = "Il company profile è obbligatorio.";
     return e;
   }
 
@@ -505,11 +472,7 @@ export function RevampAlboBStep4CertificazioniPage() {
       await saveRevampApplicationSection(appId, "S4", JSON.stringify({
         certificazioni: Object.fromEntries(CERTS_ISO.map(c => [c.key, { ...certs[c.key] }])),
         altreCertificazioni: altreCert,
-        accreditamentoFormazione: accFormazione,
-        accreditamentoRegioni: accRegioni,
-        accreditamentoTipoFormazione: accTipo,
-        accreditamentoServiziLavoro: accLavoro,
-        allegati: { visura, companyProfile: companyProf, durc, certificatiAllegati: certAlleg },
+        allegati: { visura, companyProfile: companyProf },
         attachments: buildAttachments(),
       }), false, auth.token);
       handleSave();
@@ -524,11 +487,7 @@ export function RevampAlboBStep4CertificazioniPage() {
     const payload = {
       certificazioni: Object.fromEntries(CERTS_ISO.map(c => [c.key, { ...certs[c.key] }])),
       altreCertificazioni: altreCert,
-      accreditamentoFormazione: accFormazione,
-      accreditamentoRegioni: accRegioni,
-      accreditamentoTipoFormazione: accTipo,
-      accreditamentoServiziLavoro: accLavoro,
-      allegati: { visura, companyProfile: companyProf, durc, certificatiAllegati: certAlleg },
+      allegati: { visura, companyProfile: companyProf },
     };
     sessionStorage.setItem("revamp_b4", JSON.stringify(payload));
     let savedAppId: string | null = null;
@@ -540,10 +499,7 @@ export function RevampAlboBStep4CertificazioniPage() {
           const hasISO9001 = certs.iso9001?.presente === "si";
           const apiPayload = {
             ...payload,
-            iso9001:              hasISO9001 ? "YES" : "NO",
-            accreditationSummary: accFormazione === "si" ? (accTipo || "Accreditato") : "",
-            accreditationTraining: accFormazione,
-            employmentServicesAccreditation: accLavoro,
+            iso9001: hasISO9001 ? "YES" : "NO",
             attachments: buildAttachments(),
           };
           await saveRevampApplicationSection(appId, "S4", JSON.stringify(apiPayload), true, auth.token);
@@ -643,19 +599,20 @@ export function RevampAlboBStep4CertificazioniPage() {
                       <span style={lbl}>Scadenza certificato <span style={{ color: ERR }}>*</span></span>
                       <input
                         value={rec.scadenza}
-                        onChange={e => updateCert(c.key, "scadenza", e.target.value)}
+                        onChange={e => updateCert(c.key, "scadenza", formatScadenzaInput(e.target.value))}
                         onBlur={e => {
                           const msg = validateScadenzaField(e.target.value);
                           setManualErrors(prev => ({ ...prev, [`cert_${c.key}_scad`]: msg }));
                         }}
                         placeholder="MM/AAAA"
+                        maxLength={7}
                         disabled={!certAllowed}
                         style={baseInput(!!scadErr, !certAllowed)}
                       />
                       {scadErr ? <span style={errTxt}>{scadErr}</span> : null}
                     </div>
                     <div style={col}>
-                      <FileInput label="Certificato PDF" fileName={rec.fileName} onChange={handleCertificationFile(c.key)} uploading={uploadingField === `CERTIFICATION:${c.key}`} disabled={!certAllowed} hintText="PDF max 5 MB" />
+                      <FileInput label="Certificato PDF" required fileName={rec.fileName} onChange={handleCertificationFile(c.key)} uploading={uploadingField === `CERTIFICATION:${c.key}`} disabled={!certAllowed} hintText="PDF max 5 MB" />
                       {fileErr ? <span style={errTxt}>{fileErr}</span> : null}
                     </div>
                   </div>
@@ -674,111 +631,41 @@ export function RevampAlboBStep4CertificazioniPage() {
             />
           </div>
 
-          {/* Accreditamenti */}
-          <SectionLabel label="Accreditamenti" />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-            <div>
-              <span style={lbl}>Accreditamento regionale per la formazione <span style={{ color: ERR }}>*</span></span>
-              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                {(["si","no"] as const).map(v => (
-                  <label key={v} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "7px 16px", borderRadius: 6, border: `1.5px solid ${accFormazione === v ? GREEN : "#e5e7eb"}`, background: accFormazione === v ? `${GREEN}0d` : "#fff", fontSize: "0.85rem", fontWeight: 600 }}>
-                    <input type="radio" name="accFormazione" value={v} checked={accFormazione === v} onChange={() => setAccFormazione(v)} style={{ accentColor: GREEN }} />
-                    {v === "si" ? "Sì" : "No"}
-                  </label>
-                ))}
-              </div>
-              {errors.accFormazione ? <div style={{ fontSize: "0.74rem", color: ERR, marginTop: 4 }}>{errors.accFormazione}</div> : null}
-              {accFormazione === "si" ? (
-                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={col}>
-                    <span style={lbl}>Regioni accreditate</span>
-                    <input value={accRegioni} onChange={e => setAccRegioni(e.target.value)} placeholder="Es. Lombardia, Piemonte, Veneto..." style={baseInput()} />
-                  </div>
-                  <div style={col}>
-                    <span style={lbl}>Tipo (professionale / continua / superiore)</span>
-                    <input value={accTipo} onChange={e => setAccTipo(e.target.value)} placeholder="Es. Formazione professionale, Formazione continua..." style={baseInput()} />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            <div>
-              <span style={lbl}>Accreditamento servizi al lavoro (ANPAL/Regioni) <span style={{ color: ERR }}>*</span></span>
-              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                {(["si","no"] as const).map(v => (
-                  <label key={v} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "7px 16px", borderRadius: 6, border: `1.5px solid ${accLavoro === v ? GREEN : "#e5e7eb"}`, background: accLavoro === v ? `${GREEN}0d` : "#fff", fontSize: "0.85rem", fontWeight: 600 }}>
-                    <input type="radio" name="accLavoro" value={v} checked={accLavoro === v} onChange={() => setAccLavoro(v)} style={{ accentColor: GREEN }} />
-                    {v === "si" ? "Sì" : "No"}
-                  </label>
-                ))}
-              </div>
-              {errors.accLavoro ? <div style={{ fontSize: "0.74rem", color: ERR, marginTop: 4 }}>{errors.accLavoro}</div> : null}
-              {accLavoro === "si" ? (
-                <div style={{ marginTop: 12, background: "#f0fdf4", border: `1px solid ${GREEN}40`, borderRadius: 6, padding: "10px 14px", fontSize: "0.82rem", color: "#166534" }}>
-                  ℹ Allega il provvedimento autorizzatorio nella sezione Allegati sottostante.
-                </div>
-              ) : null}
-            </div>
-          </div>
           </div>
 
           {/* Allegati aziendali */}
           <SectionLabel label="Allegati aziendali" />
-          <div style={{ background: "#fffbeb", border: "1px solid #f59e0b", borderRadius: 6, padding: "10px 14px", marginBottom: 16, fontSize: "0.82rem", color: "#92400e" }}>
-            ⚠ La visura camerale e il DURC sono obbligatori. Il company profile è consigliato.
-          </div>
+
           {uploadError ? (
             <div style={{ background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 6, padding: "10px 14px", marginBottom: 16, fontSize: "0.82rem", color: "#b91c1c" }}>
               {uploadError}
             </div>
           ) : null}
-          {/* TOP ROW — Visura + DURC */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: 16, marginBottom: 16, alignItems: "start" }}>
             <div style={col}>
               <FileInput label="Visura camerale ordinaria" required fileName={visura} onChange={handleFile("VISURA_CAMERALE", setVisura, setVisuraAttachment, 5)} uploading={uploadingField === "VISURA_CAMERALE"} disabled={!allowVisura} hintText="PDF max 5 MB" tooltip="emissione non anteriore a 6 mesi" />
               {errors.visura ? <span style={errTxt}>{errors.visura}</span> : null}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, maxWidth: 180 }}>
-                <span style={lbl}>Scadenza <span style={{ color: ERR }}>*</span></span>
-                <input
-                  value={visuraScadenza}
-                  onChange={e => setVisuraScadenza(e.target.value)}
-                  onBlur={e => {
-                    const msg = validateScadenzaField(e.target.value);
-                    setManualErrors(prev => ({ ...prev, visuraScadenza: msg }));
-                  }}
-                  placeholder="MM/AAAA"
-                  disabled={!allowVisura}
-                  style={baseInput(!!errors.visuraScadenza, !allowVisura)}
-                />
-                {errors.visuraScadenza ? <span style={errTxt}>{errors.visuraScadenza}</span> : null}
-              </div>
             </div>
-            <div style={col}>
-              <FileInput label="DURC — Documento Unico Regolarità Contributiva" required fileName={durc} onChange={handleFile("DURC", setDurc, setDurcAttachment, 5)} uploading={uploadingField === "DURC"} disabled={!allowDurc} hintText="PDF max 5 MB" tooltip="validità 120 giorni" />
-              {errors.durc ? <span style={errTxt}>{errors.durc}</span> : null}
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, maxWidth: 180 }}>
-                <span style={lbl}>Scadenza <span style={{ color: ERR }}>*</span></span>
-                <input
-                  value={durcScadenza}
-                  onChange={e => setDurcScadenza(e.target.value)}
-                  onBlur={e => {
-                    const msg = validateScadenzaField(e.target.value);
-                    setManualErrors(prev => ({ ...prev, durcScadenza: msg }));
-                  }}
-                  placeholder="MM/AAAA"
-                  disabled={!allowDurc}
-                  style={baseInput(!!errors.durcScadenza, !allowDurc)}
-                />
-                {errors.durcScadenza ? <span style={errTxt}>{errors.durcScadenza}</span> : null}
-              </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={lbl}>Scadenza <span style={{ color: ERR }}>*</span></span>
+              <input
+                value={visuraScadenza}
+                onChange={e => setVisuraScadenza(formatScadenzaInput(e.target.value))}
+                onBlur={e => {
+                  const msg = validateScadenzaField(e.target.value);
+                  setManualErrors(prev => ({ ...prev, visuraScadenza: msg }));
+                }}
+                placeholder="MM/AAAA"
+                maxLength={7}
+                disabled={!allowVisura}
+                style={baseInput(!!errors.visuraScadenza, !allowVisura)}
+              />
+              {errors.visuraScadenza ? <span style={errTxt}>{errors.visuraScadenza}</span> : null}
             </div>
           </div>
-          {/* BOTTOM ROW — Company profile + ISO certs */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <FileInput label="Company profile / presentazione aziendale" fileName={companyProf} onChange={handleFile("COMPANY_PROFILE", setCompanyProf, setCompanyProfAttachment, 10)} uploading={uploadingField === "COMPANY_PROFILE"} disabled={!allowCompanyProfile} hintText="PDF max 10 MB — consigliato" />
-            <div style={col}>
-              <FileInput label="Certificati ISO e accreditamenti" fileName={certAlleg} onChange={handleFile("CERTIFICATION", setCertAlleg, setCertAllegAttachment, 10)} uploading={uploadingField === "CERTIFICATION"} disabled={!allowCertAttachments || !allowGenericCertAttachment} hintText="PDF — un file per certificato (o archivio ZIP)" />
-              {errors.certAlleg ? <span style={errTxt}>{errors.certAlleg}</span> : null}
-            </div>
+          <div style={{ marginBottom: 16 }}>
+            <FileInput label="Company profile / presentazione aziendale" required fileName={companyProf} onChange={handleFile("COMPANY_PROFILE", setCompanyProf, setCompanyProfAttachment, 10)} uploading={uploadingField === "COMPANY_PROFILE"} disabled={!allowCompanyProfile} hintText="PDF max 10 MB" />
+            {errors.companyProf ? <span style={errTxt}>{errors.companyProf}</span> : null}
           </div>
 
         </div>

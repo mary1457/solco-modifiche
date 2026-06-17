@@ -155,6 +155,7 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
   const [tuttaItalia,    setTuttaItalia]    = useState(false);
   const [regioni,        setRegioni]        = useState<Set<string>>(new Set());
   const [accreditato,    setAccreditato]    = useState<"si" | "no" | "">("");
+  const [tuttaItaliaAcc, setTuttaItaliaAcc] = useState(false);
   const [accRegioni,     setAccRegioni]     = useState<Set<string>>(new Set());
   const [accTipi,        setAccTipi]        = useState<Set<string>>(new Set());
   const [isTerzoSettore, setIsTerzoSettore] = useState<"si" | "no" | "">("");
@@ -191,7 +192,13 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
         else { setRegioni(new Set(r)); }
       }
       if (s2.accreditatoFormazione)               setAccreditato(s2.accreditatoFormazione as "si" | "no");
-      if (Array.isArray(s2.accreditamentoRegioni)) setAccRegioni(new Set(s2.accreditamentoRegioni as string[]));
+      if (s2.tuttaItaliaAcc === true) {
+        setTuttaItaliaAcc(true);
+      } else if (Array.isArray(s2.accreditamentoRegioni)) {
+        const ar = s2.accreditamentoRegioni as string[];
+        if (ar.includes("Italia")) { setTuttaItaliaAcc(true); }
+        else { setAccRegioni(new Set(ar)); }
+      }
       if (Array.isArray(s2.accreditamentoTipi))    setAccTipi(new Set(s2.accreditamentoTipi as string[]));
       if (s2.isTerzoSettore)                      setIsTerzoSettore(s2.isTerzoSettore as "si" | "no");
       if (s2.tipoEts)                             setTipoEts(s2.tipoEts as string);
@@ -216,7 +223,7 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
     if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
     const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
     return () => clearTimeout(timer);
-  }, [dipendenti, fatturato, atecoMain, atecoSec, tuttaItalia, regioni, accreditato, accRegioni, accTipi, isTerzoSettore, tipoEts, runts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dipendenti, fatturato, atecoMain, atecoSec, tuttaItalia, regioni, accreditato, tuttaItaliaAcc, accRegioni, accTipi, isTerzoSettore, tipoEts, runts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleRegione(r: string) {
     setRegioni(prev => { const n = new Set(prev); n.has(r) ? n.delete(r) : n.add(r); return n; });
@@ -246,6 +253,7 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
   function validate(): Record<string, string> {
     const e: Record<string, string> = {};
     if (!dipendenti) e.dipendenti = "Campo obbligatorio.";
+    if (!fatturato) e.fatturato = "Campo obbligatorio.";
     if (!atecoMain.trim()) e.atecoMain = "Campo obbligatorio.";
     else if (!isValidAtecoCode(atecoMain)) e.atecoMain = ATECO_FORMAT_ERROR;
     atecoSec.forEach((value, index) => {
@@ -253,10 +261,11 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
     });
     if (!tuttaItalia && regioni.size === 0) e.regioni = "Seleziona almeno una regione di operatività.";
     if (!accreditato) e.accreditato = "Campo obbligatorio.";
-    if (accreditato === "si" && accRegioni.size === 0) e.accRegioni = "Seleziona almeno una regione di accreditamento.";
+    if (accreditato === "si" && !tuttaItaliaAcc && accRegioni.size === 0) e.accRegioni = "Seleziona almeno una regione di accreditamento.";
     if (accreditato === "si" && accTipi.size === 0) e.accTipi = "Seleziona almeno un tipo di accreditamento.";
     if (!isTerzoSettore) e.isTerzoSettore = "Campo obbligatorio.";
     if (isTerzoSettore === "si" && !tipoEts) e.tipoEts = "Seleziona il tipo di organizzazione del Terzo Settore.";
+    if (isTerzoSettore === "si" && !runts.trim()) e.runts = "Campo obbligatorio.";
     return e;
   }
 
@@ -271,7 +280,8 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
       atecoSecondari: atecoSec.map(normalizeAtecoCode).filter(Boolean),
       regioni: Array.from(regioni),
       accreditatoFormazione: accreditato,
-      accreditamentoRegioni: Array.from(accRegioni),
+      tuttaItaliaAcc: tuttaItaliaAcc || undefined,
+      accreditamentoRegioni: tuttaItaliaAcc ? ["Italia"] : Array.from(accRegioni),
       accreditamentoTipi: Array.from(accTipi),
       isTerzoSettore, tipoEts, runts,
     };
@@ -320,7 +330,8 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
       atecoSecondari: atecoSec.map(normalizeAtecoCode).filter(Boolean),
       regioni: Array.from(regioni),
       accreditatoFormazione: accreditato,
-      accreditamentoRegioni: Array.from(accRegioni),
+      tuttaItaliaAcc: tuttaItaliaAcc || undefined,
+      accreditamentoRegioni: tuttaItaliaAcc ? ["Italia"] : Array.from(accRegioni),
       accreditamentoTipi: Array.from(accTipi),
       isTerzoSettore, tipoEts, runts,
     };
@@ -388,7 +399,7 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
           <SectionLabel label="Dimensione aziendale" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <SelectField label="Numero dipendenti (attuale)" required value={dipendenti} disabled={readOnlyGroup("dimensione")} onChange={e => { setDipendenti(e.target.value); if (errors.dipendenti) setErrors(p => { const n={...p}; delete n.dipendenti; return n; }); }} options={FASCE_DIPENDENTI} error={errors.dipendenti} />
-            <SelectField label="Fatturato ultimo esercizio chiuso" value={fatturato} disabled={readOnlyGroup("dimensione")} onChange={e => setFatturato(e.target.value)} options={FASCE_FATTURATO} />
+            <SelectField label="Fatturato ultimo esercizio chiuso" required value={fatturato} disabled={readOnlyGroup("dimensione")} onChange={e => { setFatturato(e.target.value); if (errors.fatturato) setErrors(p => { const n={...p}; delete n.fatturato; return n; }); }} options={FASCE_FATTURATO} error={errors.fatturato} />
           </div>
 
           {/* ATECO */}
@@ -476,14 +487,30 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
             <div style={{ background: "#f0fdf4", border: `1px solid ${GREEN}40`, borderRadius: 8, padding: "16px 20px", marginBottom: 16 }}>
               <p style={{ fontSize: "0.82rem", color: MUTED, marginBottom: 12 }}>Seleziona le regioni e il tipo di accreditamento. Allega il provvedimento nella sezione documenti.</p>
               <div style={{ marginBottom: 12 }}>
-                <span style={lbl}>Regioni di accreditamento <span style={{ color: ERR }}>*</span></span>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, marginTop: 6 }}>
-                  {REGIONI_IT.map(r => (
-                    <label key={r} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.78rem", cursor: "pointer", padding: "4px 6px", borderRadius: 5, background: accRegioni.has(r) ? `${GREEN}0d` : "#fff", border: `1px solid ${accRegioni.has(r) ? GREEN : "#e5e7eb"}` }}>
-                      <input type="checkbox" checked={accRegioni.has(r)} disabled={readOnlyGroup("acc_formazione")} onChange={() => toggleAccRegione(r)} style={{ accentColor: GREEN }} /> {r}
-                    </label>
-                  ))}
-                </div>
+                <div style={lbl}>Regioni di accreditamento <span style={{ color: ERR }}>*</span></div>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 8, marginBottom: 14, cursor: "pointer", padding: "7px 16px", borderRadius: 6, background: tuttaItaliaAcc ? GREEN : "#f0fdf4", border: `1.5px solid ${tuttaItaliaAcc ? GREEN : "#86efac"}`, fontWeight: 700, fontSize: "0.84rem", color: tuttaItaliaAcc ? "#fff" : GREEN, transition: "background .15s, color .15s", userSelect: "none" }}>
+                  <input
+                    type="checkbox"
+                    checked={tuttaItaliaAcc}
+                    disabled={readOnlyGroup("acc_formazione")}
+                    onChange={() => {
+                      setTuttaItaliaAcc(v => !v);
+                      if (!tuttaItaliaAcc) setAccRegioni(new Set());
+                      if (errors.accRegioni) setErrors(prev => { const n = { ...prev }; delete n.accRegioni; return n; });
+                    }}
+                    style={{ accentColor: "#fff", width: 15, height: 15 }}
+                  />
+                  Tutta Italia
+                </label>
+                {!tuttaItaliaAcc && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 8 }}>
+                    {REGIONI_IT.map(r => (
+                      <label key={r} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem", cursor: "pointer", padding: "6px 8px", borderRadius: 6, background: accRegioni.has(r) ? `${GREEN}0d` : "#f9fafb", border: `1px solid ${accRegioni.has(r) ? GREEN : "#e5e7eb"}`, transition: "background .12s" }}>
+                        <input type="checkbox" checked={accRegioni.has(r)} disabled={readOnlyGroup("acc_formazione")} onChange={() => toggleAccRegione(r)} style={{ accentColor: GREEN }} /> {r}
+                      </label>
+                    ))}
+                  </div>
+                )}
                 {errors.accRegioni ? <div style={{ fontSize: "0.74rem", color: ERR, marginTop: 4 }}>{errors.accRegioni}</div> : null}
               </div>
               <div>
@@ -526,8 +553,9 @@ export function RevampAlboBStep2StrutturaDimensionePage() {
                   {errors.tipoEts ? <span style={errTxt}>{errors.tipoEts}</span> : null}
                 </div>
                 <div style={col}>
-                  <span style={lbl}>N. iscrizione RUNTS <span style={{ fontWeight: 400, color: MUTED }}>(opzionale)</span></span>
-                  <input value={runts} disabled={readOnlyGroup("terzo_settore")} onChange={e => setRunts(e.target.value)} placeholder="Numero e sezione di iscrizione al RUNTS" style={baseInput()} />
+                  <span style={lbl}>N. iscrizione RUNTS <span style={{ color: ERR }}>*</span></span>
+                  <input value={runts} disabled={readOnlyGroup("terzo_settore")} onChange={e => { setRunts(e.target.value); if (errors.runts) setErrors(p => { const n = {...p}; delete n.runts; return n; }); }} placeholder="Numero e sezione di iscrizione al RUNTS" style={baseInput(!!errors.runts)} />
+                  {errors.runts ? <div style={{ fontSize: "0.74rem", color: ERR, marginTop: 4 }}>{errors.runts}</div> : null}
                 </div>
               </div>
             </div>

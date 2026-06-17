@@ -127,6 +127,16 @@ export function RevampStep5DichiarazioniPage() {
   const isB = registryParam === "albo-b";
   if (!isA && !isB) return <Navigate to="/apply" replace />;
 
+  const step4BackPath = (() => {
+    if (!isA) return `/apply/${registryParam}/step/4`;
+    const main = sessionStorage.getItem("revamp_tipologia") ?? "";
+    const secRaw = sessionStorage.getItem("revamp_secondary_roles");
+    const secondary: string[] = secRaw ? (JSON.parse(secRaw) as string[]) : [];
+    const sequence = [main, ...secondary].filter(Boolean);
+    const last = sequence[sequence.length - 1];
+    return last ? `/apply/${registryParam}/step/4/${last}` : `/apply/${registryParam}/step/4`;
+  })();
+
   const tipologia = sessionStorage.getItem("revamp_tipologia") ?? "";
   const isDocente = isA && tipologia === "docente";
   const accent    = isA ? NAVY : GREEN;
@@ -371,7 +381,7 @@ export function RevampStep5DichiarazioniPage() {
       {/* ── Bottom nav ── */}
       {!fcr.active && <div className="wizard-bottom-nav" style={{ background: "#fff", borderTop: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 36px", position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
         <Link className="wizard-nav-button wizard-nav-button-prev"
-          to={`/apply/${registryParam}/step/4`}
+          to={step4BackPath}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 20px", background: "#fff", border: `1.5px solid ${accent}`, borderRadius: 6, fontWeight: 600, fontSize: "0.84rem", color: accent, textDecoration: "none" }}
         >
           <ArrowLeft size={14} /> Sezione precedente

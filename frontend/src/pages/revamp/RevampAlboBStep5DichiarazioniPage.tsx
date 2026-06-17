@@ -37,7 +37,7 @@ const CHECKS_REQUIRED: { key: CheckKey; titolo: string; testo: string }[] = [
   {
     key: "regolaritaContributiva",
     titolo: "Regolarità contributiva e fiscale",
-    testo: "Confermata dal DURC allegato e dalla piena regolarità fiscale dell'azienda alla data di iscrizione.",
+    testo: "Confermata dal DURC e dalla piena regolarità fiscale dell'azienda alla data di iscrizione.",
   },
   {
     key: "sicurezza81",

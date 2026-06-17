@@ -1,10 +1,10 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CheckCircle, Info, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Save } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
-import { getMyLatestRevampApplication, getRevampApplicationSections, saveRevampApplicationSection, type RevampSectionSnapshot } from "../../api/revampApplicationApi";
+import { getMyLatestRevampApplication, getRevampApplicationSections, saveRevampApplicationSection } from "../../api/revampApplicationApi";
 import { loadRevampApplicationIdForRegistry, saveRevampApplicationIdForRegistry } from "../../utils/revampApplicationSession";
-import { clearRevampIntegrationEditSession, integrationEditHasAnyCode, isRevampIntegrationEditFor, loadRevampIntegrationEditSession } from "../../utils/revampIntegrationEditSession";
+import { clearRevampIntegrationEditSession, isRevampIntegrationEditFor } from "../../utils/revampIntegrationEditSession";
 import { completeRevampIntegrationEdit } from "../../utils/revampIntegrationCompletion";
 import { loadRevampFcrEditSession } from "../../utils/revampFcrEditSession";
 import { useFcrEditMode } from "../../hooks/useFcrEditMode";
@@ -14,222 +14,97 @@ const NAVY  = "#0f2a52";
 const GREEN = "#1a5c3a";
 const MUTED = "#6b7280";
 const ERR   = "#dc2626";
+const INFO_BG     = "#eff6ff";
+const INFO_BORDER = "#93c5fd";
+const INFO_TEXT   = "#1d4ed8";
 
 const STEPS = ["Anagrafica", "Tipologia", "Competenze", "Disponibilità", "Dichiarazioni"];
 
-/* ─── shared options ─────────────────────────────── */
-const TITOLI_STUDIO = [
-  { value: "licenza_media",    label: "Licenza media" },
-  { value: "diploma",          label: "Diploma di scuola secondaria superiore" },
-  { value: "laurea_triennale", label: "Laurea triennale (L)" },
-  { value: "laurea_magistrale",label: "Laurea magistrale / specialistica (LM/LS)" },
-  { value: "master_1",         label: "Master universitario di I livello" },
-  { value: "master_2",         label: "Master universitario di II livello" },
-  { value: "dottorato",        label: "Dottorato di Ricerca" },
-  { value: "equipollente",     label: "Titolo equipollente estero" },
+/* ─── card definitions ─────────────────────────── */
+type CardDef = { id: string; title: string; tag: string; desc: string; badge?: string };
+
+const CARDS_A: CardDef[] = [
+  { id: "docente",        title: "Docente / Formatore",                       tag: "Formazione e didattica",        desc: "Sezione dedicata con aree tematiche, metodologie e strumenti didattici", badge: "Percorso approfondito" },
+  { id: "consulente_hr",  title: "Consulente HR / Sviluppo Organizzativo",    tag: "Organizzazione e persone",      desc: "Consulenza su risorse umane, recruiting, welfare, sviluppo organizzativo" },
+  { id: "cdo_lavoro",     title: "Consulente del Lavoro",                     tag: "Professionista iscritto CPO",   desc: "Payroll, contrattualistica, contenzioso, rapporti di lavoro" },
+  { id: "commercialista", title: "Commercialista / Dottore Commercialista",   tag: "Professionista iscritto ODCEC", desc: "Contabilità, bilancio, fiscalità d'impresa, finanza agevolata" },
+  { id: "avvocato",       title: "Avvocato / Consulente Legale",              tag: "Professionista iscritto CNF",   desc: "Diritto del lavoro, GDPR, contrattualistica, terzo settore" },
+  { id: "digital",        title: "Consulente Digital & E-Learning",           tag: "Tecnologie per la formazione",  desc: "LMS, contenuti digitali, UX/UI, strumenti di authoring" },
+  { id: "finanza",        title: "Consulente Finanza Agevolata e Bandi",      tag: "Bandi e contributi pubblici",   desc: "Fondi EU, crediti d'imposta, progettazione e rendicontazione" },
+  { id: "psicologo",      title: "Psicologo del Lavoro / Career Coach",       tag: "Sviluppo persone",              desc: "Assessment, outplacement, coaching individuale e di gruppo" },
+  { id: "orientatore",    title: "Orientatore professionale",                 tag: "Servizi al lavoro",             desc: "Bilancio competenze, counseling di carriera, accompagnamento" },
+  { id: "ricercatore",    title: "Ricercatore / Valutatore",                  tag: "Ricerca e valutazione",         desc: "Ricerca applicata, valutazione di progetti, monitoraggio e impact" },
+  { id: "altro",          title: "Altro professionista (specificare)",        tag: "Specifica il tuo ambito",       desc: "Inserisci il codice ATECO per personalizzare il questionario" },
 ];
 
-const ANNI_DOC = [
-  { value: "meno1",   label: "Meno di 1" },
-  { value: "1_5",     label: "1–5" },
-  { value: "6_10",    label: "6–10" },
-  { value: "11_15",   label: "11–15" },
-  { value: "oltre16", label: "Oltre 16" },
-];
-
-const ANNI_PROF = [
-  { value: "meno1",   label: "Meno di 1 anno" },
-  { value: "1_5",     label: "1–5 anni" },
-  { value: "6_10",    label: "6–10 anni" },
-  { value: "11_15",   label: "11–15 anni" },
-  { value: "oltre16", label: "Oltre 16 anni" },
-];
-
-const REGIONI_IT = [
-  "Abruzzo","Basilicata","Calabria","Campania","Emilia-Romagna",
-  "Friuli-Venezia Giulia","Lazio","Liguria","Lombardia","Marche",
-  "Molise","Piemonte","Puglia","Sardegna","Sicilia","Toscana",
-  "Trentino-Alto Adige","Umbria","Valle d'Aosta","Veneto",
-];
-
-/* ─── 3A: aree tematiche ─────────────────────────── */
-type AreaItem = { id: string; label: string };
-export const AREE_TEMATICHE: AreaItem[] = [
-  { id: "digitale_base",  label: "Competenze digitali di base" },
-  { id: "digitale_adv",   label: "Competenze digitali avanzate e specialistiche" },
-  { id: "lingue",         label: "Lingue straniere / Italiano per stranieri" },
-  { id: "soft_skills",    label: "Soft skills e life skills" },
-  { id: "outdoor",        label: "Formazione outdoor / esperienziale" },
-  { id: "hr",             label: "Human Resources" },
-  { id: "manageriale",    label: "Formazione manageriale" },
-  { id: "sistemi",        label: "Sistemi di gestione (ISO 9001, SA8000, ecc.)" },
-  { id: "comunicazione",  label: "Comunicazione, marketing e social media" },
-  { id: "grafica",        label: "Grafica e design" },
-  { id: "ssl_ob",         label: "Salute e Sicurezza sul lavoro — obbligatoria" },
-  { id: "ssl_nob",        label: "Salute e Sicurezza sul lavoro — non obbligatoria" },
-  { id: "giuridico",      label: "Giuridico" },
-  { id: "fondi_eu",       label: "Gestione Fondi Strutturali EU" },
-  { id: "economico",      label: "Economico / finanziario" },
-  { id: "commercio",      label: "Commercio e vendita" },
-  { id: "pm",             label: "Project Management" },
-  { id: "green",          label: "Green economy / sostenibilità ambientale" },
-  { id: "sanita",         label: "Sanità / socio-assistenziale" },
-  { id: "logistica",      label: "Logistica e trasporti" },
-  { id: "agricoltura",    label: "Agricoltura" },
-  { id: "turismo",        label: "Turismo ed enogastronomia" },
-  { id: "tecnico_prof",   label: "Formazione tecnico-professionale" },
-  { id: "audiovisivo",    label: "Audiovisivo e spettacolo" },
-  { id: "cultura",        label: "Cultura e beni culturali" },
-  { id: "scolastico",     label: "Formazione in contesti scolastici" },
-  { id: "altro_area",     label: "Altro (specificare ambito e tematiche)" },
-];
-
-const AMBITI_CONSULENZA = [
-  "Orientamento professionale", "Accompagnamento al lavoro", "Coaching",
-  "Assistenza tecnica ai programmi comunitari e nazionali", "Business Plan e creazione d'impresa",
-  "Change management", "Consulenza aziendale e di direzione", "Gestione risorse umane",
-  "Direzione e coordinamento", "Monitoraggio e valutazione", "Progettazione fondi EU",
-  "Progettazione formativa", "Rendicontazione", "Ricerca sociale e di mercato", "Tutoraggio",
-];
-
-/* ─── 3B: servizi per tipologia ─────────────────── */
-const SERVIZI_MAP: Record<string, string[]> = {
-  cdo_lavoro:     ["Payroll e amministrazione", "Gestione contratti e rapporti di lavoro", "Contenzioso e controversie", "Welfare aziendale", "Applicazione CCNL", "Somministrazione"],
-  commercialista: ["Contabilità e bilancio", "Fiscalità d'impresa", "Finanza agevolata e crediti d'imposta", "Valutazione d'azienda"],
-  avvocato:       ["Diritto del lavoro", "Contrattualistica commerciale", "Privacy e GDPR", "Terzo settore", "Diritto societario", "Contenziosi"],
-  psicologo:      ["Assessment individuale e di gruppo", "Outplacement", "Sviluppo leadership", "Counseling"],
-  finanza:        ["Bandi regionali e nazionali", "Fondi strutturali europei", "Credito d'imposta R&S e formazione", "Finanza alternativa"],
-  orientatore:    ["Bilancio di competenze", "Counseling di carriera", "Orientamento e Accompagnamento al lavoro"],
+const TIPO_TO_PROFESSIONAL: Record<string, string> = {
+  docente: "DOCENTE_FORMATORE",
+  ricercatore: "DOCENTE_FORMATORE",
+  psicologo: "PSICOLOGO_COACH",
+  coach: "PSICOLOGO_COACH",
+  mediatore: "PSICOLOGO_COACH",
+  consulente_hr: "CONSULENTE",
+  cdo_lavoro: "CONSULENTE",
+  commercialista: "CONSULENTE",
+  avvocato: "CONSULENTE",
+  digital: "CONSULENTE",
+  finanza: "CONSULENTE",
+  orientatore: "CONSULENTE",
+  altro: "ALTRO",
 };
 
-/* ─── types ──────────────────────────────────────── */
-type AreaEntry = { specifica: string; anni: string };
-type AreaState = { checked: boolean; entries: AreaEntry[] };
-type AreasMap  = Record<string, AreaState>;
-
-function initAree(): AreasMap {
-  return Object.fromEntries(AREE_TEMATICHE.map(a => [a.id, { checked: false, entries: [{ specifica: "", anni: "" }] }]));
+function professionalTypeForTipologia(tipologia: string | null): string {
+  return tipologia ? (TIPO_TO_PROFESSIONAL[tipologia] ?? "CONSULENTE") : "";
 }
 
-/* ─── shared ui helpers ──────────────────────────── */
-type OC  = (e: ChangeEvent<HTMLInputElement>)    => void;
-type OCT = (e: ChangeEvent<HTMLTextAreaElement>) => void;
-type OCS = (e: ChangeEvent<HTMLSelectElement>)   => void;
+function professionalTypesForTipologie(tipologie: Iterable<string>): string[] {
+  return Array.from(new Set(Array.from(tipologie).map(professionalTypeForTipologia).filter(Boolean)));
+}
 
-const s_input = (err?: boolean): React.CSSProperties => ({
-  width: "100%", padding: "9px 11px", fontSize: "0.86rem",
-  border: `1.5px solid ${err ? ERR : "#d1d5db"}`, borderRadius: 6,
-  outline: "none", boxSizing: "border-box", color: "#111827", background: "#fff",
-});
-const s_textarea = (err?: boolean): React.CSSProperties => ({
-  ...s_input(err), resize: "vertical" as const, minHeight: 68, fontFamily: "inherit",
-});
-const COL: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 4 };
-const LBL: React.CSSProperties = { fontSize: "0.77rem", fontWeight: 600, color: "#374151" };
-const HINT: React.CSSProperties = { fontWeight: 400, color: MUTED };
-const ERRTXT: React.CSSProperties = { fontSize: "0.73rem", color: ERR };
+function infoMessage(cardId: string): string {
+  const map: Record<string, string> = {
+    docente:        "Hai selezionato 'Docente / Formatore': il questionario includerà la Sezione 4A con aree tematiche dettagliate, metodologie, disponibilità, esperienze formative e allegati.",
+    consulente_hr:  "Hai selezionato 'Consulente HR / Sviluppo Organizzativo': il questionario includerà sezioni su competenze HR, strumenti utilizzati e principali settori serviti.",
+    cdo_lavoro:     "Hai selezionato 'Consulente del Lavoro': il questionario includerà sezioni su iscrizione all'ordine, specializzazioni e portfolio clienti.",
+    commercialista: "Hai selezionato 'Commercialista / Dottore Commercialista': il questionario includerà sezioni su iscrizione ODCEC, specializzazioni fiscali e struttura dello studio.",
+    avvocato:       "Hai selezionato 'Avvocato / Consulente Legale': il questionario includerà sezioni su iscrizione CNF, aree di pratica e referenze.",
+    digital:        "Hai selezionato 'Consulente Digital & E-Learning': il questionario includerà sezioni su tecnologie usate, portfolio prodotti e certificazioni.",
+    finanza:        "Hai selezionato 'Consulente Finanza Agevolata e Bandi': il questionario includerà sezioni su tipologie di bandi gestiti, volumi e referenze.",
+    psicologo:      "Hai selezionato 'Psicologo del Lavoro / Career Coach': il questionario includerà sezioni su iscrizione all'ordine, certificazioni di coaching e metodologie.",
+    orientatore:    "Hai selezionato 'Orientatore professionale': il questionario includerà sezioni su accreditamento, servizi erogati e bacino territoriale.",
+    ricercatore:    "Hai selezionato 'Ricercatore / Valutatore': il questionario includerà sezioni su aree di ricerca, metodologie e pubblicazioni o report prodotti.",
+    altro:          "Hai selezionato 'Altro professionista': inserisci il codice ATECO per personalizzare il questionario.",
+  };
+  return map[cardId] ?? "";
+}
 
-function Field({ label, required, value, onChange, error, placeholder, type = "text", hint, tooltip }: {
-  label: string; required?: boolean; value: string; onChange: OC;
-  error?: string; placeholder?: string; type?: string; hint?: string; tooltip?: string;
-}) {
-  const [showTip, setShowTip] = useState(false);
+/* ─── ui primitives ─────────────────────────────── */
+function TypeCard({ card, selected, onClick, accent, disabled = false }: { card: CardDef; selected: boolean; onClick: () => void; accent: string; disabled?: boolean }) {
   return (
-    <div style={COL}>
-      <span style={{ ...LBL, display: "flex", alignItems: "center", gap: 4 }}>
-        {label}{required && <span style={{ color: ERR }}> *</span>}
-        {hint && <span style={HINT}> — {hint}</span>}
-        {tooltip && (
-          <span
-            style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
-            onMouseEnter={() => setShowTip(true)}
-            onMouseLeave={() => setShowTip(false)}
-          >
-            <Info size={12} style={{ color: MUTED, cursor: "help" }} />
-            {showTip && (
-              <span style={{
-                position: "absolute", bottom: "calc(100% + 4px)", left: "50%",
-                transform: "translateX(-50%)", background: "#1f2937", color: "#fff",
-                fontSize: "0.72rem", padding: "4px 8px", borderRadius: 4,
-                whiteSpace: "nowrap", pointerEvents: "none", zIndex: 100,
-              }}>{tooltip}</span>
-            )}
-          </span>
-        )}
-      </span>
-      <input type={type} placeholder={placeholder ?? ""} value={value} onChange={onChange} style={s_input(!!error)} />
-      {error && <span style={ERRTXT}>{error}</span>}
+    <div onClick={disabled ? undefined : onClick} style={{ background: selected ? `${accent}08` : "#fff", border: `1.5px solid ${selected ? accent : "#e5e7eb"}`, borderRadius: 8, padding: "14px 12px", cursor: disabled ? "default" : "pointer", transition: "border-color .15s, background .15s", display: "flex", flexDirection: "column", gap: 7, minHeight: 110 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ width: 16, height: 16, border: `2px solid ${selected ? accent : "#d1d5db"}`, borderRadius: 3, background: selected ? accent : "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {selected ? <span style={{ color: "#fff", fontSize: "0.6rem", fontWeight: 900, lineHeight: 1 }}>✓</span> : null}
+        </span>
+        {selected ? <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "2px 7px" }}>Selezionato</span> : null}
+      </div>
+      <div style={{ fontWeight: 700, fontSize: "0.85rem", color: selected ? accent : "#1e293b", lineHeight: 1.25 }}>{card.title}</div>
+      {card.badge && selected ? <span style={{ fontSize: "0.65rem", fontWeight: 600, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 4, padding: "2px 6px", alignSelf: "flex-start" }}>{card.badge}</span> : null}
+      <div style={{ fontSize: "0.73rem", color: MUTED, fontStyle: "italic" }}>{card.tag}</div>
+      <div style={{ fontSize: "0.76rem", color: "#4b5563", lineHeight: 1.4 }}>{card.desc}</div>
     </div>
   );
 }
 
-function Textarea({ label, required, value, onChange, error, placeholder, hint, rows = 3 }: {
-  label: string; required?: boolean; value: string; onChange: OCT;
-  error?: string; placeholder?: string; hint?: string; rows?: number;
-}) {
+function SecondaryCheck({ card, checked, onChange, accent, disabled = false }: { card: CardDef; checked: boolean; onChange: (e: ChangeEvent<HTMLInputElement>) => void; accent: string; disabled?: boolean }) {
   return (
-    <div style={COL}>
-      <span style={LBL}>{label}{required && <span style={{ color: ERR }}> *</span>}{hint && <span style={HINT}> — {hint}</span>}</span>
-      <textarea placeholder={placeholder ?? ""} value={value} onChange={onChange} rows={rows} style={s_textarea(!!error)} />
-      {error && <span style={ERRTXT}>{error}</span>}
-    </div>
-  );
-}
-
-function Select({ label, required, value, onChange, options, error, hint }: {
-  label: string; required?: boolean; value: string; onChange: OCS;
-  options: { value: string; label: string }[]; error?: string; hint?: string;
-}) {
-  return (
-    <div style={COL}>
-      <span style={LBL}>{label}{required && <span style={{ color: ERR }}> *</span>}{hint && <span style={HINT}> — {hint}</span>}</span>
-      <select value={value} onChange={onChange} style={s_input(!!error)}>
-        <option value="">Seleziona...</option>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      {error && <span style={ERRTXT}>{error}</span>}
-    </div>
-  );
-}
-
-function SubLabel({ label, accent }: { label: string; accent: string }) {
-  return (
-    <div style={{ fontSize: "0.71rem", fontWeight: 700, color: accent, letterSpacing: "0.06em", textTransform: "uppercase" as const, margin: "20px 0 10px", borderLeft: `3px solid ${accent}`, paddingLeft: 8 }}>
-      {label}
-    </div>
-  );
-}
-
-function SectionCard({ title, desc, accent, className, children }: { title: string; desc?: string; accent: string; className?: string; children: React.ReactNode }) {
-  const fcrSession = loadRevampFcrEditSession();
-  const integrationSession = loadRevampIntegrationEditSession();
-  const automaticGroups = title.includes("Istruzione")
-    ? ["istruzione"]
-    : title.includes("Aree Tematiche")
-      ? ["competenze", "territorio", "lingue"]
-      : title.includes("Profilo Professionale")
-        ? ["istruzione", "servizi_offerti", "cert_specifiche"]
-        : [];
-  const integrationActive = integrationSession && automaticGroups.length
-    ? (
-        title.includes("Aree Tematiche")
-          ? integrationEditHasAnyCode(integrationSession, ["THEMATIC_SPECIFICATION"])
-          : title.includes("Profilo Professionale")
-            ? integrationEditHasAnyCode(integrationSession, ["THEMATIC_SPECIFICATION", "EXPERIENCE_CONSISTENCY"])
-            : false
-      )
-    : false;
-  const effectiveClassName = className ?? (integrationSession && automaticGroups.length
-    ? integrationActive ? "fcr-active-group" : "fcr-locked"
-    : fcrSession && automaticGroups.length
-    ? automaticGroups.includes(fcrSession.sectionKey) ? "fcr-active-group" : "fcr-locked"
-    : undefined);
-  return (
-    <div className={effectiveClassName} style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", padding: "22px 26px", marginBottom: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: "1rem", color: accent, marginBottom: desc ? 4 : 14 }}>{title}</div>
-      {desc && <p style={{ fontSize: "0.82rem", color: MUTED, margin: "0 0 16px", lineHeight: 1.5 }}>{desc}</p>}
-      {children}
-    </div>
+    <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: disabled ? "default" : "pointer", padding: "8px 10px", borderRadius: 6, background: checked ? `${accent}06` : "#fff", border: `1px solid ${checked ? accent : "#e5e7eb"}`, transition: "background .12s, border-color .12s" }}>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={onChange} style={{ marginTop: 2, accentColor: accent, flexShrink: 0 }} />
+      <div>
+        <div style={{ fontSize: "0.82rem", fontWeight: 600, color: checked ? accent : "#1e293b", lineHeight: 1.3 }}>{card.title}</div>
+        <div style={{ fontSize: "0.72rem", color: MUTED, fontStyle: "italic" }}>{card.tag}</div>
+      </div>
+    </label>
   );
 }
 
@@ -282,90 +157,36 @@ export function RevampStep3CompetenzePage() {
   const isB = registryParam === "albo-b";
   if (!isA && !isB) return <Navigate to="/apply" replace />;
 
-  const tipologia = sessionStorage.getItem("revamp_tipologia") ?? "";
-  const isDocente = isA && tipologia === "docente";
   const accent = isA ? NAVY : GREEN;
   const title = isA ? "Albo A — Professionisti" : "Albo B — Aziende";
   const registryType = isA ? "ALBO_A" : "ALBO_B";
   const integrationEdit = isRevampIntegrationEditFor(registryType, 3);
   const fcr = useFcrEditMode();
-  const subtitle = isDocente
-    ? "Sezione 3A · Scheda Docente / Formatore"
-    : "Sezione 3 · Profilo Professionale";
 
-  /* ── 3A state ──────────────────────────────────── */
-  const [titoloStudio,     setTitoloStudio]    = useState("");
-  const [ambitoStudio,     setAmbitoStudio]    = useState("");
-  const [annoConseg,       setAnnoConseg]       = useState("");
-  const [certAbitazioni,   setCertAbitazioni]  = useState("");
-  const [aree,             setAree]            = useState<AreasMap>(initAree);
-  const [docenzaPA,        setDocenzaPA]       = useState("");
-  const [consulenza,       setConsulenza]      = useState<Set<string>>(new Set());
-  const [tuttaItaliaA,     setTuttaItaliaA]    = useState(false);
-  const [regioniA,         setRegioniA]        = useState<Set<string>>(new Set());
-  const [lingue,           setLingue]          = useState<string[]>([""]);
-  const [lingueDocenza,    setLingueDocenza]   = useState("");
-  const [strumenti,        setStrumenti]       = useState("");
-  const [reti,             setReti]            = useState("");
-
-  /* ── 3B state ──────────────────────────────────── */
-  const [ordine,       setOrdine]       = useState("");
-  const [titoloB,      setTitoloB]      = useState("");
-  const [ambitoB,      setAmbitoB]      = useState("");
-  const [anniEsp,      setAnniEsp]      = useState("");
-  const [servizi,      setServizi]      = useState<Set<string>>(new Set());
-  const [altroServ,    setAltroServ]    = useState("");
-  const [certB,        setCertB]        = useState("");
+  /* ── Albo A state ──────────────────────────────── */
+  const [selected,       setSelected]       = useState<string | null>(null);
+  const [secondaryRoles, setSecondaryRoles] = useState<Set<string>>(new Set());
+  const [atecoQuery,     setAtecoQuery]     = useState("");
+  const [atecoError,     setAtecoError]     = useState(false);
+  const [mainError,      setMainError]      = useState(false);
 
   /* ── shared ────────────────────────────────────── */
-  const [errors,  setErrors]  = useState<Record<string, string>>({});
-  const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [sectionWasCompleted, setSectionWasCompleted] = useState(false);
+  const [savedAt,    setSavedAt]    = useState<string | null>(null);
+  const [saveError,  setSaveError]  = useState<string | null>(null);
   const isFirstRenderRef = useRef(true);
 
+  /* ── load S3 (Albo A tipologia fields) ── */
   useEffect(() => {
-    if (!auth?.token) return;
+    if (!auth?.token || !isA) return;
 
-    function applyS3(sections: RevampSectionSnapshot[]) {
-      const latest = sections
-        .filter(s => ["S3", "S3A", "S3B"].includes(s.sectionKey))
-        .sort((a, b) => b.sectionVersion - a.sectionVersion)[0];
+    function applyS3(sections: { sectionKey: string; sectionVersion: number; payloadJson: string }[]) {
+      const latest = sections.filter(s => s.sectionKey === "S3").sort((a, b) => b.sectionVersion - a.sectionVersion)[0];
       if (!latest) return;
-      if (latest.completed) setSectionWasCompleted(true);
-      const s3 = JSON.parse(latest.payloadJson) as Record<string, unknown>;
-      if (s3.titoloStudio)      setTitoloStudio(s3.titoloStudio as string);
-      if (s3.ambitoStudio)      setAmbitoStudio(s3.ambitoStudio as string);
-      if (s3.annoConseg)        setAnnoConseg(s3.annoConseg as string);
-      if (s3.certAbitazioni)    setCertAbitazioni(s3.certAbitazioni as string);
-      if (Array.isArray(s3.aree) && s3.aree.length) {
-        const savedEntries = ((s3.areeEntries ?? {}) as Record<string, AreaEntry[]>);
-        setAree(prev => {
-          const n = { ...prev };
-          (s3.aree as string[]).forEach(id => {
-            if (n[id]) {
-              const entries = savedEntries[id];
-              n[id] = { checked: true, entries: (entries && entries.length) ? entries : [{ specifica: "", anni: "" }] };
-            }
-          });
-          return n;
-        });
-      }
-      if (s3.docenzaPA)         setDocenzaPA(s3.docenzaPA as string);
-      if (Array.isArray(s3.consulenza)) setConsulenza(new Set(s3.consulenza as string[]));
-      if (s3.tuttaItaliaA === true) { setTuttaItaliaA(true); }
-      else if (Array.isArray(s3.regioniA) && (s3.regioniA as string[]).length) { setRegioniA(new Set(s3.regioniA as string[])); }
-      if (Array.isArray(s3.lingue) && (s3.lingue as string[]).length) setLingue(s3.lingue as string[]);
-      else if (s3.lingue && typeof s3.lingue === "string") setLingue([s3.lingue as string]);
-      if (s3.lingueDocenza)     setLingueDocenza(s3.lingueDocenza as string);
-      if (s3.strumenti)         setStrumenti(s3.strumenti as string);
-      if (s3.reti)              setReti(s3.reti as string);
-      if (s3.ordine)            setOrdine(s3.ordine as string);
-      if (s3.titoloB)           setTitoloB(s3.titoloB as string);
-      if (s3.ambitoB)           setAmbitoB(s3.ambitoB as string);
-      if (s3.anniEsp)           setAnniEsp(s3.anniEsp as string);
-      if (Array.isArray(s3.servizi)) setServizi(new Set(s3.servizi as string[]));
-      if (s3.altroServ)         setAltroServ(s3.altroServ as string);
-      if (s3.certB)             setCertB(s3.certB as string);
+      const data = JSON.parse(latest.payloadJson) as Record<string, unknown>;
+      if (data.tipologia)                  setSelected(data.tipologia as string);
+      if (Array.isArray(data.multiRuoli))  setSecondaryRoles(new Set(data.multiRuoli as string[]));
+      if (data.atecoCode)                  setAtecoQuery(data.atecoCode as string);
+      else if (data.ateco)                 setAtecoQuery(data.ateco as string);
     }
 
     const existingAppId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
@@ -373,23 +194,19 @@ export function RevampStep3CompetenzePage() {
       getRevampApplicationSections(existingAppId, auth.token).then(applyS3).catch(() => {});
       return;
     }
-
     getMyLatestRevampApplication(auth.token).then(app => {
       if (!app || app.status !== "DRAFT" || app.registryType !== registryType) return;
       saveRevampApplicationIdForRegistry(registryType, app.id);
       return getRevampApplicationSections(app.id, auth!.token!).then(applyS3);
     }).catch(() => {});
-  }, [auth?.token, registryType]);
+  }, [auth?.token, registryType, isA]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!isA) return;
     if (isFirstRenderRef.current) { isFirstRenderRef.current = false; return; }
     const timer = setTimeout(() => { void handleSaveDraft(); }, 2000);
     return () => clearTimeout(timer);
-  }, [titoloStudio, ambitoStudio, annoConseg, certAbitazioni, aree, docenzaPA, consulenza, tuttaItaliaA, regioniA, lingue, lingueDocenza, strumenti, reti, ordine, titoloB, ambitoB, anniEsp, servizi, altroServ, certB]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function clearErr(key: string) {
-    setErrors(p => { const n = { ...p }; delete n[key]; return n; });
-  }
+  }, [selected, secondaryRoles, atecoQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSave() {
     const now = new Date();
@@ -397,479 +214,234 @@ export function RevampStep3CompetenzePage() {
   }
 
   async function handleSaveDraft() {
-    if (!auth?.token) return;
+    if (!auth?.token || !isA) return;
     try {
       const appId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
       if (!appId) return;
-      const areeChecked = AREE_TEMATICHE.filter(a => aree[a.id].checked).map(a => a.id);
-      const areeEntries = Object.fromEntries(areeChecked.map(id => [id, aree[id].entries]));
-      const draftPayload = JSON.stringify({
-        titoloStudio, ambitoStudio, annoConseg, certAbitazioni,
-        aree: areeChecked, areeEntries, tuttaItaliaA, regioniA: Array.from(regioniA), lingue, lingueDocenza, strumenti, reti,
-        docenzaPA, consulenza: Array.from(consulenza),
-        titoloB, ambitoB, anniEsp, ordine, certB,
-        servizi: Array.from(servizi), altroServ,
-      });
-      const sectionKey = isA && isDocente ? "S3A" : isA ? "S3B" : "S3";
-      await saveRevampApplicationSection(appId, sectionKey, draftPayload, sectionWasCompleted, auth.token);
+      const professionalType = professionalTypeForTipologia(selected);
+      const secondaryProfessionalTypes = professionalTypesForTipologie(secondaryRoles);
+      await saveRevampApplicationSection(appId, "S3", JSON.stringify({
+        tipologia: selected ?? "",
+        professionalType,
+        multiRuoli: Array.from(secondaryRoles),
+        secondaryProfessionalTypes,
+        atecoCode: atecoQuery,
+      }), !!selected, auth.token);
       handleSave();
     } catch { /* best-effort */ }
   }
 
-  function toggleArea(id: string) {
-    setAree(prev => ({ ...prev, [id]: { ...prev[id], checked: !prev[id].checked } }));
-    clearErr("aree");
-  }
-  function setEntryField(id: string, idx: number, f: "specifica" | "anni", v: string) {
-    setAree(prev => {
-      const entries = prev[id].entries.map((e, i) => i === idx ? { ...e, [f]: v } : e);
-      return { ...prev, [id]: { ...prev[id], entries } };
-    });
-    clearErr(`specifica_${id}_${idx}`);
-    clearErr(`anni_${id}_${idx}`);
-  }
-  function addEntry(id: string) {
-    setAree(prev => ({ ...prev, [id]: { ...prev[id], entries: [...prev[id].entries, { specifica: "", anni: "" }] } }));
-  }
-  function removeEntry(id: string, idx: number) {
-    setAree(prev => {
-      const entries = prev[id].entries.filter((_, i) => i !== idx);
-      return { ...prev, [id]: { ...prev[id], entries: entries.length ? entries : [{ specifica: "", anni: "" }] } };
-    });
-  }
-  function toggleConsulenza(v: string) {
-    setConsulenza(prev => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; });
-  }
-  function toggleServizio(v: string) {
-    setServizi(prev => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; });
-    clearErr("servizi");
-  }
-
   async function saveSectionProgrammatic() {
-    if (!auth?.token) throw new Error("Sessione scaduta. Effettua nuovamente il login.");
+    if (!auth?.token || !isA) return;
     const appId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
     if (!appId) throw new Error("Candidatura non trovata.");
-    const areeChecked = AREE_TEMATICHE.filter(a => aree[a.id].checked).map(a => a.id);
-    const areeEntries = Object.fromEntries(areeChecked.map(id => [id, aree[id].entries]));
-    const frontendPayload = {
-      titoloStudio, ambitoStudio, annoConseg, certAbitazioni,
-      aree: areeChecked, areeEntries,
-      tuttaItaliaA, regioniA: Array.from(regioniA), lingue, lingueDocenza, strumenti, reti,
-      docenzaPA, consulenza: Array.from(consulenza),
-      titoloB, ambitoB, anniEsp, ordine, certB,
-      servizi: Array.from(servizi), altroServ,
-    };
-    const presentationStr = tuttaItaliaA ? "Tutta Italia" : Array.from(regioniA).join(", ");
-    if (isA && isDocente) {
-      await saveRevampApplicationSection(appId, "S3A", JSON.stringify({
-        ...frontendPayload,
-        thematicAreasCsv: areeChecked.join(","),
-        education: { highestTitle: titoloStudio, studyArea: ambitoStudio, graduationYear: annoConseg },
-        presentation: presentationStr,
-      }), true, auth.token);
-      return;
-    }
-    if (isA) {
-      await saveRevampApplicationSection(appId, "S3B", JSON.stringify({
-        ...frontendPayload,
-        professionalOrder: ordine,
-        highestTitle: titoloB,
-        studyArea: ambitoB,
-        experienceBand: anniEsp,
-        services: Array.from(servizi),
-        hourlyRateRange: "",
-        territory: { regionsCsv: "", provincesCsv: "" },
-      }), sectionWasCompleted, auth.token);
-      return;
-    }
-    await saveRevampApplicationSection(appId, "S3", JSON.stringify(frontendPayload), true, auth.token);
+    const professionalType = professionalTypeForTipologia(selected);
+    const secondaryProfessionalTypes = professionalTypesForTipologie(secondaryRoles);
+    await saveRevampApplicationSection(appId, "S3", JSON.stringify({
+      tipologia: selected ?? "",
+      professionalType,
+      multiRuoli: Array.from(secondaryRoles),
+      secondaryProfessionalTypes,
+      atecoCode: atecoQuery,
+    }), true, auth.token);
   }
 
-  function validate(): Record<string, string> {
-    const e: Record<string, string> = {};
-    if (integrationEdit) return e;
-    if (isDocente) {
-      if (!titoloStudio) e.titoloStudio = "Campo obbligatorio.";
-      if (!ambitoStudio.trim()) e.ambitoStudio = "Campo obbligatorio.";
-      if (!annoConseg.trim()) {
-        e.annoConseg = "Campo obbligatorio.";
-      } else if (!/^\d{4}$/.test(annoConseg.trim()) || +annoConseg < 1940 || +annoConseg > new Date().getFullYear()) {
-        e.annoConseg = "Inserisci un anno valido (AAAA).";
-      }
-      const nChecked = AREE_TEMATICHE.filter(a => aree[a.id].checked).length;
-      if (nChecked === 0) e.aree = "Seleziona almeno un ambito tematico.";
-      for (const area of AREE_TEMATICHE) {
-        const st = aree[area.id];
-        if (st.checked) {
-          st.entries.forEach((entry, idx) => {
-            if (!entry.specifica.trim()) e[`specifica_${area.id}_${idx}`] = "Obbligatorio.";
-            if (!entry.anni)             e[`anni_${area.id}_${idx}`]      = "Obbligatorio.";
-          });
-        }
-      }
-      if (!docenzaPA) e.docenzaPA = "Campo obbligatorio.";
-      if (!tuttaItaliaA && regioniA.size === 0) e.regioniA = "Seleziona almeno una regione di operatività.";
-    } else {
-      if (!titoloB)          e.titoloB   = "Campo obbligatorio.";
-      if (!ambitoB.trim())   e.ambitoB   = "Campo obbligatorio.";
-      if (!anniEsp)          e.anniEsp   = "Campo obbligatorio.";
-      if (servizi.size === 0 && !altroServ.trim()) e.servizi = "Indica almeno un servizio offerto.";
-    }
-    return e;
+  function toggleSecondary(id: string) {
+    setSecondaryRoles(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
   async function handleNext() {
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    handleSave();
-    const areeChecked = AREE_TEMATICHE.filter(a => aree[a.id].checked).map(a => a.id);
-    const areeEntries = Object.fromEntries(areeChecked.map(id => [id, aree[id].entries]));
-    const frontendPayload = {
-      titoloStudio, ambitoStudio, annoConseg, certAbitazioni,
-      aree: areeChecked, areeEntries,
-      tuttaItaliaA, regioniA: Array.from(regioniA), lingue, lingueDocenza, strumenti, reti,
-      docenzaPA, consulenza: Array.from(consulenza),
-      titoloB, ambitoB, anniEsp, ordine, certB,
-      servizi: Array.from(servizi), altroServ,
-    };
-    const presentationStr = tuttaItaliaA ? "Tutta Italia" : Array.from(regioniA).join(", ");
-    sessionStorage.setItem("revamp_s3", JSON.stringify(frontendPayload));
-    let savedAppId: string | null = null;
-    if (auth?.token) {
-      try {
-        const appId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
-        if (appId) {
-          savedAppId = appId;
-          if (isA && isDocente) {
-            /* S3A — Docente / Formatore */
-            const s3aPayload = {
-              ...frontendPayload,
-              thematicAreasCsv: areeChecked.join(","),
-              education: { highestTitle: titoloStudio, studyArea: ambitoStudio, graduationYear: annoConseg },
-              presentation: presentationStr,
-            };
-            await saveRevampApplicationSection(appId, "S3A", JSON.stringify(s3aPayload), true, auth.token);
-          } else if (isA && !isDocente) {
-            /* S3B — Altri professionisti (incomplete: hourlyRateRange comes from Step4) */
-            const s3bPayload = {
-              ...frontendPayload,
-              professionalOrder: ordine,
-              highestTitle: titoloB,
-              studyArea: ambitoB,
-              experienceBand: anniEsp,
-              services: Array.from(servizi),
-              hourlyRateRange: "",
-              territory: { regionsCsv: "", provincesCsv: "" },
-            };
-            await saveRevampApplicationSection(appId, "S3B", JSON.stringify(s3bPayload), false, auth.token);
-          } else {
-            /* Albo B — unchanged */
-            await saveRevampApplicationSection(appId, "S3", JSON.stringify(frontendPayload), true, auth.token);
+    setSaveError(null);
+
+    if (isA) {
+      if (!selected) { setMainError(true); return; }
+      if (selected === "altro" && !atecoQuery.trim()) { setAtecoError(true); return; }
+      setMainError(false);
+      setAtecoError(false);
+      sessionStorage.setItem("revamp_tipologia", selected);
+      sessionStorage.setItem("revamp_secondary_roles", JSON.stringify(Array.from(secondaryRoles)));
+      handleSave();
+      let savedAppId: string | null = null;
+      if (auth?.token) {
+        try {
+          const appId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
+          if (appId) {
+            savedAppId = appId;
+            const professionalType = professionalTypeForTipologia(selected);
+            const secondaryProfessionalTypes = professionalTypesForTipologie(secondaryRoles);
+            await saveRevampApplicationSection(appId, "S3", JSON.stringify({
+              tipologia: selected,
+              professionalType,
+              multiRuoli: Array.from(secondaryRoles),
+              secondaryProfessionalTypes,
+              atecoCode: atecoQuery,
+            }), true, auth.token);
           }
+        } catch {
+          setSaveError("Salvataggio non riuscito. Controlla i dati e riprova.");
+          return;
         }
-      } catch {
-        window.alert("Salvataggio non riuscito. Controlla i dati e riprova.");
-        return;
       }
+      if (integrationEdit && auth?.token && savedAppId) {
+        try {
+          await completeRevampIntegrationEdit(savedAppId, auth.token, integrationEdit);
+          clearRevampIntegrationEditSession();
+        } catch {
+          setSaveError("Invio integrazione non riuscito. Controlla i dati e riprova.");
+          return;
+        }
+      }
+      navigate(integrationEdit?.returnPath ?? `/apply/${registryParam}/step/4/${selected}`);
+      return;
     }
-    if (integrationEdit && auth?.token && savedAppId) {
-      try {
-        await completeRevampIntegrationEdit(savedAppId, auth.token, integrationEdit);
-        clearRevampIntegrationEditSession();
-      } catch {
-        window.alert("Invio integrazione non riuscito. Controlla i dati e riprova.");
-        return;
+
+    // Albo B — pass-through
+    if (integrationEdit && auth?.token) {
+      const appId = loadRevampFcrEditSession()?.applicationId ?? loadRevampApplicationIdForRegistry(registryType);
+      if (appId) {
+        try {
+          await completeRevampIntegrationEdit(appId, auth.token, integrationEdit);
+          clearRevampIntegrationEditSession();
+        } catch {
+          setSaveError("Invio integrazione non riuscito. Controlla i dati e riprova.");
+          return;
+        }
       }
     }
     navigate(integrationEdit?.returnPath ?? `/apply/${registryParam}/step/4`);
   }
 
-  const checkedAree  = AREE_TEMATICHE.filter(a => aree[a.id].checked).length;
-  const serviziList  = SERVIZI_MAP[tipologia] ?? [];
+  const isAltro   = selected === "altro";
+  const secondary = CARDS_A.filter(c => c.id !== selected);
+  const info      = selected ? infoMessage(selected) : null;
 
   return (
     <div style={{ margin: "-1rem", background: "#f0f4f8", minHeight: "100%" }}>
-      <PageHeader title={title} subtitle={subtitle} savedAt={savedAt} onSave={() => void handleSaveDraft()} />
+      <PageHeader title={title} subtitle="Sezione 3 · Tipologia" savedAt={savedAt} onSave={() => void handleSaveDraft()} />
       {integrationEdit || fcr.active ? (
         <div style={{ background: "#eff6ff", borderBottom: "1px solid #bfdbfe", padding: "12px 40px", color: "#174f82", fontSize: "0.86rem", fontWeight: 700 }}>
-          {fcr.active ? "Richiesta di modifica - Aggiorna solo il gruppo sbloccato, poi salva e invia." : "Integrazione richiesta - Correggi la sezione Competenze, salva e invia la risposta."}
+          {fcr.active ? "Richiesta di modifica - Aggiorna solo il gruppo sbloccato, poi salva e invia." : "Integrazione richiesta - Correggi la sezione, salva e invia la risposta."}
         </div>
       ) : (
         <StepBar active={2} accent={accent} />
       )}
 
-      <div style={{ maxWidth: 980, margin: "20px auto", padding: "0 20px 100px" }}>
-
-        {/* ══════════════════════════════════════════
-            SEZIONE 3A — SCHEDA DOCENTE / FORMATORE
-        ══════════════════════════════════════════ */}
-        {isDocente && (
-          <>
-            {/* ── A — Istruzione e Abilitazioni ── */}
-            <SectionCard title="A — Istruzione e Abilitazioni" accent={accent}
-              desc="Inserisci il tuo titolo di studio più elevato, l'indirizzo e l'anno di conseguimento.">
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 14, marginBottom: 14 }}>
-                <Select label="Titolo di studio più elevato" required value={titoloStudio}
-                  onChange={e => { setTitoloStudio(e.target.value); clearErr("titoloStudio"); }}
-                  options={TITOLI_STUDIO} error={errors.titoloStudio} />
-                <Field label="Anno di conseguimento" required value={annoConseg}
-                  onChange={e => { setAnnoConseg(e.target.value); clearErr("annoConseg"); }}
-                  placeholder="AAAA" error={errors.annoConseg} />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <Textarea label="Ambito / Indirizzo di studio" required value={ambitoStudio}
-                  onChange={e => { setAmbitoStudio(e.target.value); clearErr("ambitoStudio"); }}
-                  placeholder="Es. Laurea Magistrale in Psicologia del lavoro e delle organizzazioni; Master in Instructional Design e E-Learning"
-                  error={errors.ambitoStudio} rows={2} />
-              </div>
-              <Textarea label="Certificazioni e abilitazioni" hint="opzionale" value={certAbitazioni}
-                onChange={e => setCertAbitazioni(e.target.value)}
-                placeholder="Es. certificazioni linguistiche, ICT, Project Management, qualifica docente SSL, iscrizioni ad albi professionali..." rows={2} />
-            </SectionCard>
-
-            {/* ── B — Aree Tematiche ── */}
-            <SectionCard title="B — Aree Tematiche di Competenza" accent={accent}
-              desc="Seleziona tutti gli ambiti in cui sei in grado di erogare docenza o formazione. Per ogni ambito selezionato specifica i sottotemi trattati e la tua fascia di esperienza.">
-
-              {/* counter / error */}
-              {errors.aree ? (
-                <div style={{ background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 6, padding: "9px 12px", marginBottom: 12, fontSize: "0.82rem", color: "#b91c1c" }}>⚠ {errors.aree}</div>
-              ) : checkedAree > 0 ? (
-                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "8px 12px", marginBottom: 12, fontSize: "0.78rem", color: "#16a34a" }}>
-                  ✓ {checkedAree} {checkedAree === 1 ? "ambito selezionato" : "ambiti selezionati"}
-                </div>
-              ) : (
-                <div style={{ background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 6, padding: "8px 12px", marginBottom: 12, fontSize: "0.78rem", color: "#1d4ed8" }}>
-                  ℹ Seleziona almeno un ambito. Per ogni voce selezionata compila i campi obbligatori.
-                </div>
-              )}
-
-              {/* area list */}
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-                {AREE_TEMATICHE.map((area, idx) => {
-                  const st = aree[area.id];
-                  const hasFieldErr = st.entries.some((_, i) => !!(errors[`specifica_${area.id}_${i}`] || errors[`anni_${area.id}_${i}`]));
-                  return (
-                    <div key={area.id} style={{ borderBottom: idx < AREE_TEMATICHE.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-                      <div onClick={() => toggleArea(area.id)}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", background: st.checked ? `${accent}05` : (hasFieldErr ? "#fff5f5" : "transparent") }}>
-                        <span style={{ width: 18, height: 18, border: `2px solid ${st.checked ? accent : "#d1d5db"}`, borderRadius: 3, background: st.checked ? accent : "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {st.checked && <span style={{ color: "#fff", fontSize: "0.65rem", fontWeight: 900 }}>✓</span>}
-                        </span>
-                        <span style={{ fontSize: "0.85rem", fontWeight: st.checked ? 600 : 400, color: st.checked ? accent : "#374151", flex: 1 }}>{area.label}</span>
-                        {hasFieldErr && <span style={{ fontSize: "0.7rem", color: ERR }}>● compila i campi</span>}
-                      </div>
-                      {st.checked && (
-                        <div style={{ padding: "0 14px 14px 42px" }}>
-                          {st.entries.map((entry, eIdx) => (
-                            <div key={eIdx} style={{ display: "grid", gridTemplateColumns: "1fr 170px 32px", gap: 10, marginBottom: eIdx < st.entries.length - 1 ? 10 : 0 }}>
-                              <div style={COL}>
-                                {eIdx === 0 && <span style={LBL}>Specifica tematiche <span style={{ color: ERR }}>*</span></span>}
-                                <input type="text" value={entry.specifica}
-                                  onChange={e => setEntryField(area.id, eIdx, "specifica", e.target.value)}
-                                  placeholder="Indica i sottotemi specifici trattati..."
-                                  style={s_input(!!errors[`specifica_${area.id}_${eIdx}`])} />
-                                {errors[`specifica_${area.id}_${eIdx}`] && <span style={ERRTXT}>{errors[`specifica_${area.id}_${eIdx}`]}</span>}
-                              </div>
-                              <div style={COL}>
-                                {eIdx === 0 && <span style={LBL}>Anni di esperienza <span style={{ color: ERR }}>*</span></span>}
-                                <select value={entry.anni} onChange={e => setEntryField(area.id, eIdx, "anni", e.target.value)} style={s_input(!!errors[`anni_${area.id}_${eIdx}`])}>
-                                  <option value="">Seleziona...</option>
-                                  {ANNI_DOC.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
-                                {errors[`anni_${area.id}_${eIdx}`] && <span style={ERRTXT}>{errors[`anni_${area.id}_${eIdx}`]}</span>}
-                              </div>
-                              <div style={{ display: "flex", alignItems: "center" }}>
-                                {eIdx > 0 ? (
-                                  <button type="button" onClick={() => removeEntry(area.id, eIdx)}
-                                    style={{ width: 28, height: 28, border: "1.5px solid #e5e7eb", borderRadius: 6, background: "#fff", color: ERR, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                    ×
-                                  </button>
-                                ) : <span style={{ width: 28 }} />}
-                              </div>
-                            </div>
-                          ))}
-                          <button type="button" onClick={() => addEntry(area.id)}
-                            style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 5, fontSize: "0.8rem", color: accent, background: "none", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 600 }}>
-                            + Aggiungi tematica
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Docenza PA */}
-              <SubLabel label="Docenza per la Pubblica Amministrazione" accent={accent} />
-              <div style={{ maxWidth: 400 }}>
-                <Select label="Hai esperienza di docenza per la PA?" required value={docenzaPA}
-                  onChange={e => { setDocenzaPA(e.target.value); clearErr("docenzaPA"); }}
-                  options={[
-                    { value: "si_centrale",  label: "Sì — PA centrale (Ministeri, Agenzie)" },
-                    { value: "si_locale",    label: "Sì — PA locale (Comuni, Regioni, ASL, ecc.)" },
-                    { value: "si_entrambe",  label: "Sì — entrambe" },
-                    { value: "no",           label: "No" },
-                  ]}
-                  error={errors.docenzaPA} />
-              </div>
-
-              {/* Ambiti di consulenza */}
-              <SubLabel label="Ambiti di consulenza offerti" accent={accent} />
-              <p style={{ fontSize: "0.81rem", color: MUTED, margin: "0 0 10px", lineHeight: 1.5 }}>
-                Oltre alla docenza, indica le tematiche su cui offri anche servizi di consulenza. <em>Opzionale.</em>
-              </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 6 }}>
-                {AMBITI_CONSULENZA.map(amb => (
-                  <label key={amb} style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: "0.81rem", color: consulenza.has(amb) ? accent : "#374151", fontWeight: consulenza.has(amb) ? 600 : 400 }}>
-                    <input type="checkbox" checked={consulenza.has(amb)} onChange={() => toggleConsulenza(amb)} style={{ accentColor: accent }} />
-                    {amb}
-                  </label>
-                ))}
-              </div>
-
-              {/* Area territoriale */}
-              <SubLabel label="Area territoriale di attività in presenza" accent={accent} />
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 14, cursor: "pointer", padding: "7px 16px", borderRadius: 6, background: tuttaItaliaA ? accent : "#eff6ff", border: `1.5px solid ${tuttaItaliaA ? accent : "#93c5fd"}`, fontWeight: 700, fontSize: "0.84rem", color: tuttaItaliaA ? "#fff" : accent, transition: "background .15s, color .15s", userSelect: "none" }}>
-                <input type="checkbox" checked={tuttaItaliaA} onChange={() => { setTuttaItaliaA(v => !v); if (!tuttaItaliaA) setRegioniA(new Set()); clearErr("regioniA"); }} style={{ accentColor: "#fff", width: 15, height: 15 }} />
-                Tutta Italia
-              </label>
-              {!tuttaItaliaA && (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 8 }}>
-                    {REGIONI_IT.map(r => (
-                      <label key={r} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem", cursor: "pointer", padding: "6px 8px", borderRadius: 6, background: regioniA.has(r) ? `${accent}0d` : "#f9fafb", border: `1px solid ${regioniA.has(r) ? accent : "#e5e7eb"}`, transition: "background .12s" }}>
-                        <input type="checkbox" checked={regioniA.has(r)} onChange={() => { setRegioniA(prev => { const n = new Set(prev); n.has(r) ? n.delete(r) : n.add(r); return n; }); clearErr("regioniA"); }} style={{ accentColor: accent }} /> {r}
-                      </label>
-                    ))}
-                  </div>
-                  {regioniA.size > 0 && <div style={{ fontSize: "0.78rem", color: "#16a34a", marginBottom: 4 }}>✓ {regioniA.size} {regioniA.size === 1 ? "regione selezionata" : "regioni selezionate"}</div>}
-                </>
-              )}
-              {errors.regioniA && <div style={{ fontSize: "0.74rem", color: ERR, marginBottom: 12 }}>{errors.regioniA}</div>}
-
-              {/* Lingue e strumenti */}
-              <SubLabel label="Lingue, strumenti digitali e reti professionali" accent={accent} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={COL}>
-                  <span style={LBL}>Lingue parlate (oltre all'italiano) e livello QCER <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
-                  {lingue.map((val, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: i < lingue.length - 1 ? 6 : 0 }}>
-                      <input type="text" value={val}
-                        onChange={e => setLingue(prev => prev.map((v, idx) => idx === i ? e.target.value : v))}
-                        placeholder="Es. Inglese B2"
-                        style={s_input()} />
-                      {i > 0 && (
-                        <button type="button" onClick={() => setLingue(prev => prev.filter((_, idx) => idx !== i))}
-                          style={{ width: 28, height: 28, border: "1.5px solid #e5e7eb", borderRadius: 6, background: "#fff", color: ERR, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button type="button" onClick={() => setLingue(prev => [...prev, ""])}
-                    style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 5, fontSize: "0.8rem", color: accent, background: "none", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 600, alignSelf: "flex-start" }}>
-                    + Aggiungi lingua
-                  </button>
-                </div>
-                <div style={COL}>
-                  <span style={LBL}>Lingue straniere in cui può erogare docenza <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
-                  <input type="text" value={lingueDocenza} onChange={e => setLingueDocenza(e.target.value)} maxLength={200} placeholder="Es. Inglese, Francese..." style={s_input()} />
-                </div>
-                <div style={COL}>
-                  <span style={LBL}>Strumenti digitali rilevanti <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
-                  <input type="text" value={strumenti} onChange={e => setStrumenti(e.target.value)} maxLength={200} placeholder="Es. Mural, Mentimeter, MS Teams, Zoom, Power BI, Canva..." style={s_input()} />
-                </div>
-                <div style={COL}>
-                  <span style={LBL}>Partecipazione a reti professionali o associazioni <span style={{ color: MUTED, fontWeight: 400 }}>(opz.)</span></span>
-                  <input type="text" value={reti} onChange={e => setReti(e.target.value)} maxLength={200} placeholder="Es. AIF, AIDP, AIFOS, Federmanager..." style={s_input()} />
-                </div>
-              </div>
-            </SectionCard>
-          </>
-        )}
-
-        {/* ══════════════════════════════════════════
-            SEZIONE 3B — ALTRI PROFESSIONISTI
-        ══════════════════════════════════════════ */}
-        {!isDocente && (
-          <SectionCard title="Profilo Professionale" accent={accent}
-            desc="Compila i dati relativi alle tue qualifiche, ai servizi che offri al Gruppo Solco e alle certificazioni rilevanti.">
-
-            {/* Istruzione e ordine */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-              <Select label="Titolo di studio più elevato" required value={titoloB}
-                onChange={e => { setTitoloB(e.target.value); clearErr("titoloB"); }}
-                options={TITOLI_STUDIO} error={errors.titoloB} />
-              <Select label="Anni di esperienza professionale complessiva" required value={anniEsp}
-                onChange={e => { setAnniEsp(e.target.value); clearErr("anniEsp"); }}
-                options={ANNI_PROF} error={errors.anniEsp} />
-              <Field label="Ordine professionale di appartenenza" tooltip="se iscritto"
-                value={ordine} onChange={e => setOrdine(e.target.value)}
-                placeholder="Es. CPO, CNF, ODCEC, Ordine Psicologi..." />
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <Textarea label="Ambito / Indirizzo di studio" required value={ambitoB}
-                onChange={e => { setAmbitoB(e.target.value); clearErr("ambitoB"); }}
-                placeholder="Es. Laurea Magistrale in Giurisprudenza, specializzazione in Diritto del Lavoro"
-                error={errors.ambitoB} rows={2} />
-            </div>
-
-            {/* Servizi offerti */}
-            <SubLabel label="Servizi offerti al Gruppo Solco" accent={accent} />
-            {errors.servizi && (
-              <div style={{ background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 6, padding: "9px 12px", marginBottom: 10, fontSize: "0.81rem", color: "#b91c1c" }}>
-                ⚠ {errors.servizi}
-              </div>
-            )}
-            {serviziList.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 7, marginBottom: 12 }}>
-                {serviziList.map(s => (
-                  <label key={s} style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: "0.82rem", color: servizi.has(s) ? accent : "#374151", fontWeight: servizi.has(s) ? 600 : 400 }}>
-                    <input type="checkbox" checked={servizi.has(s)} onChange={() => toggleServizio(s)} style={{ accentColor: accent }} />
-                    {s}
-                  </label>
-                ))}
-              </div>
-            )}
-            <div style={{ marginBottom: 14 }}>
-              <Textarea
-                label={serviziList.length > 0 ? "Altro / campo libero" : "Descrivi i servizi offerti"}
-                required={serviziList.length === 0}
-                value={altroServ} onChange={e => { setAltroServ(e.target.value); clearErr("servizi"); }}
-                placeholder="Descrivi i servizi che offri al Gruppo Solco..."
-                error={serviziList.length === 0 ? errors.servizi : undefined} rows={2} />
-            </div>
-
-            {/* Certificazioni */}
-            <SubLabel label="Certificazioni e abilitazioni specifiche" accent={accent} />
-            <Textarea label="Abilitazioni, specializzazioni post-laurea, master rilevanti" hint="opzionale"
-              value={certB} onChange={e => setCertB(e.target.value)}
-              placeholder="Es. abilitazione professionale, certificazione internazionale, master rilevante..." rows={2} />
-          </SectionCard>
-        )}
-
-      </div>
-
-      {/* ── Bottom nav ── */}
-      {!fcr.active && <div className="wizard-bottom-nav" style={{ background: "#fff", borderTop: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 36px", position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
-        <Link className="wizard-nav-button wizard-nav-button-prev" to={integrationEdit?.returnPath ?? `/apply/${registryParam}/step/2`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 20px", background: "#fff", border: `1.5px solid ${accent}`, borderRadius: 6, fontWeight: 600, fontSize: "0.84rem", color: accent, textDecoration: "none" }}>
-          <ArrowLeft size={14} /> {integrationEdit ? "Torna alla richiesta" : "Sezione precedente"}
-        </Link>
-        {integrationEdit ? (
-          <div style={{ fontSize: "0.77rem", color: MUTED, fontWeight: 700 }}>Modalita integrazione</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-            <span style={{ fontSize: "0.77rem", color: MUTED }}>Avanzamento: <strong>60%</strong></span>
-            <div style={{ width: 180, height: 4, background: "#e5e7eb", borderRadius: 2, overflow: "hidden" }}>
-              <div style={{ width: "60%", height: "100%", background: accent, borderRadius: 2 }} />
-            </div>
+      <div style={{ maxWidth: 1120, margin: "24px auto", padding: "0 24px 100px" }}>
+        {saveError && (
+          <div style={{ background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 16, fontSize: "0.85rem", color: ERR }}>
+            {saveError}
           </div>
         )}
-        <button className="wizard-nav-button wizard-nav-button-next" type="button" onClick={handleNext} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: accent, color: "#fff", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.84rem", cursor: "pointer" }}>
-          {integrationEdit ? "Salva e invia integrazione" : "Sezione successiva"} <ArrowRight size={14} />
-        </button>
-      </div>}
+
+        {isA && (
+          <>
+            {/* ── Card: Tipologia principale ── */}
+            <div className={fcr.active ? (fcr.isLocked("tipo_prof") ? "fcr-locked" : "fcr-active-group") : undefined} style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", padding: "24px 28px", marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1e293b", margin: "0 0 4px" }}>
+                    Tipologia principale <span style={{ color: ERR }}>*</span>
+                  </h2>
+                  <p style={{ fontSize: "0.83rem", color: MUTED, margin: 0 }}>
+                    Seleziona la tua tipologia principale. La scelta determina le sezioni successive del questionario.
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: mainError ? 14 : 20 }}>
+                {CARDS_A.map(card => (
+                  <TypeCard key={card.id} card={card} selected={selected === card.id}
+                    onClick={() => {
+                      setSelected(card.id);
+                      setMainError(false);
+                      setSecondaryRoles(prev => { const n = new Set(prev); n.delete(card.id); return n; });
+                    }}
+                    accent={accent}
+                    disabled={fcr.active && fcr.isLocked("tipo_prof")}
+                  />
+                ))}
+              </div>
+              {mainError && (
+                <div style={{ background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 6, padding: "10px 14px", marginBottom: 14, fontSize: "0.83rem", color: "#b91c1c" }}>
+                  ⚠ Seleziona una tipologia professionale per procedere.
+                </div>
+              )}
+              {info && (
+                <div style={{ background: INFO_BG, border: `1px solid ${INFO_BORDER}`, borderRadius: 6, padding: "11px 14px", fontSize: "0.83rem", color: INFO_TEXT }}>
+                  ℹ {info}
+                </div>
+              )}
+            </div>
+
+            {/* ── Card: Codice ATECO (only when "Altro") ── */}
+            {isAltro && (
+              <div className={fcr.active ? (fcr.isLocked("ateco") ? "fcr-locked" : "fcr-active-group") : undefined} style={{ background: "#fff", borderRadius: 10, border: `1px solid ${atecoError ? "#fca5a5" : "#e5e7eb"}`, padding: "22px 28px", marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 4 }}>
+                  Codice ATECO principale <span style={{ color: ERR }}>*</span>
+                </div>
+                <p style={{ fontSize: "0.83rem", color: MUTED, margin: "0 0 14px" }}>
+                  Obbligatorio per chi seleziona "Altro professionista". Digita parole chiave per trovare il codice corrispondente alla tua attività.
+                </p>
+                <input type="text" value={atecoQuery}
+                  disabled={fcr.active && fcr.isLocked("ateco")}
+                  onChange={e => { setAtecoQuery(e.target.value); if (atecoError) setAtecoError(false); }}
+                  placeholder="Es. 85.59 — Corsi tenuti da docenti indipendenti..."
+                  style={{ width: "100%", maxWidth: 480, padding: "9px 12px", fontSize: "0.87rem", border: `1.5px solid ${atecoError ? "#fca5a5" : "#d1d5db"}`, borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff", color: "#111827" }}
+                />
+                {atecoError && <div style={{ fontSize: "0.75rem", color: "#b91c1c", marginTop: 6 }}>Inserisci il codice ATECO per procedere.</div>}
+              </div>
+            )}
+
+            {/* ── Card: Disponibilità in più ruoli ── */}
+            {selected && (
+              <div className={fcr.active ? (fcr.isLocked("comp_secondarie") ? "fcr-locked" : "fcr-active-group") : undefined} style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", padding: "22px 28px" }}>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 4 }}>
+                  Disponibilità a lavorare in più ruoli
+                  <span style={{ fontWeight: 400, fontSize: "0.78rem", color: MUTED, marginLeft: 8 }}>opzionale</span>
+                </div>
+                <p style={{ fontSize: "0.83rem", color: MUTED, margin: "0 0 16px", lineHeight: 1.5 }}>
+                  Indica se ti proponi anche in altri ambiti oltre alla tipologia principale selezionata (es. un docente che offre anche consulenza HR). Questa informazione arricchisce le possibilità di ricerca.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {secondary.map(card => (
+                    <SecondaryCheck key={card.id} card={card}
+                      checked={secondaryRoles.has(card.id)}
+                      onChange={() => toggleSecondary(card.id)}
+                      accent={accent}
+                      disabled={fcr.active && fcr.isLocked("comp_secondarie")}
+                    />
+                  ))}
+                </div>
+                {secondaryRoles.size > 0 && (
+                  <div style={{ marginTop: 12, fontSize: "0.78rem", color: "#16a34a" }}>
+                    ✓ {secondaryRoles.size} {secondaryRoles.size === 1 ? "ruolo aggiuntivo selezionato" : "ruoli aggiuntivi selezionati"}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {!fcr.active && (
+        <div className="wizard-bottom-nav" style={{ background: "#fff", borderTop: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 36px", position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10 }}>
+          <Link className="wizard-nav-button wizard-nav-button-prev" to={integrationEdit?.returnPath ?? `/apply/${registryParam}/step/2`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 20px", background: "#fff", border: `1.5px solid ${accent}`, borderRadius: 6, fontWeight: 600, fontSize: "0.84rem", color: accent, textDecoration: "none" }}>
+            <ArrowLeft size={14} /> {integrationEdit ? "Torna alla richiesta" : "Sezione precedente"}
+          </Link>
+          {integrationEdit ? (
+            <div style={{ fontSize: "0.77rem", color: MUTED, fontWeight: 700 }}>Modalita integrazione</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: "0.77rem", color: MUTED }}>Avanzamento: <strong>60%</strong></span>
+              <div style={{ width: 180, height: 4, background: "#e5e7eb", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ width: "60%", height: "100%", background: accent, borderRadius: 2 }} />
+              </div>
+            </div>
+          )}
+          <button className="wizard-nav-button wizard-nav-button-next" type="button" onClick={handleNext} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: accent, color: "#fff", border: "none", borderRadius: 6, fontWeight: 600, fontSize: "0.84rem", cursor: "pointer" }}>
+            {integrationEdit ? "Salva e invia integrazione" : "Sezione successiva"} <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
       {auth && <FcrSubmitBar fcr={fcr} token={auth.token!} onSectionSaved={saveSectionProgrammatic} />}
     </div>
   );
