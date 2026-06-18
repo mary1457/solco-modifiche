@@ -294,8 +294,7 @@ CREATE TABLE evaluations (
     reference_code               VARCHAR(100),
     overall_score                SMALLINT     NOT NULL CHECK (overall_score BETWEEN 1 AND 5),
     comment                      TEXT,
-    created_at                   TIMESTAMP    NOT NULL DEFAULT NOW(),
-    CONSTRAINT uk_evaluation_supplier_evaluator UNIQUE (supplier_registry_profile_id, evaluator_user_id)
+    created_at                   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_evaluations_supplier

@@ -18,7 +18,7 @@ const INFO_BG     = "#eff6ff";
 const INFO_BORDER = "#93c5fd";
 const INFO_TEXT   = "#1d4ed8";
 
-const STEPS = ["Anagrafica", "Tipologia", "Competenze", "Disponibilità", "Dichiarazioni"];
+const STEPS = ["Anagrafica", "Competenze", "Tipologia", "Esperienze", "Dichiarazioni"];
 
 /* ─── card definitions ─────────────────────────── */
 type CardDef = { id: string; title: string; tag: string; desc: string; badge?: string };

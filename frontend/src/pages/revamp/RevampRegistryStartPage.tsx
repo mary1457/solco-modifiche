@@ -33,7 +33,7 @@ const GREEN = "#1a5c3a";
 const MUTED = "#6b7280";
 const ERR   = "#dc2626";
 
-const STEPS = ["Anagrafica", "Tipologia", "Competenze", "Disponibilità", "Dichiarazioni"];
+const STEPS = ["Anagrafica", "Competenze", "Tipologia", "Esperienze", "Dichiarazioni"];
 
 const REGIMI_FISCALI = [
   { value: "ordinario",   label: "Regime ordinario" },

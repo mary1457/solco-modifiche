@@ -15,7 +15,7 @@ const GREEN = "#1a5c3a";
 const MUTED = "#6b7280";
 const ERR   = "#dc2626";
 
-const STEPS = ["Anagrafica", "Tipologia", "Competenze", "Disponibilità", "Dichiarazioni"];
+const STEPS = ["Anagrafica", "Competenze", "Tipologia", "Esperienze", "Dichiarazioni"];
 
 /* ─── shared options ─────────────────────────────── */
 const ANNI_DOC = [

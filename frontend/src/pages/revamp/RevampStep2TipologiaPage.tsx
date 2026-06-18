@@ -108,7 +108,7 @@ function FileUpload({ label, required, hint, tooltip, uploading = false, result 
   );
 }
 
-const STEPS = ["Anagrafica", "Tipologia", "Competenze", "Disponibilità", "Dichiarazioni"];
+const STEPS = ["Anagrafica", "Competenze", "Tipologia", "Esperienze", "Dichiarazioni"];
 
 /* ─── card definitions ─────────────────────────── */
 type CardDef = {
@@ -544,7 +544,7 @@ export function RevampStep2TipologiaPage() {
 
       <PageHeader
         title={title}
-        subtitle="Sezione 2 di 5 · Tipologia Professionale"
+        subtitle="Sezione 2 di 5 · Competenze"
         badge={savedAt ? `Bozza salvata ${savedAt}` : "Salva bozza"}
         onSave={() => void handleSaveDraft()}
       />
