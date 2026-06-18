@@ -61,7 +61,7 @@ public class RevampEvaluationController {
             @Valid @RequestBody SubmitEvaluationRequest request
     ) {
         revampAccessGuard.requireWriteEnabled();
-        RevampEvaluationSummaryDto dto = evaluationService.upsertEvaluation(
+        RevampEvaluationSummaryDto dto = evaluationService.addEvaluation(
                 supplierId,
                 getCurrentUserId(),
                 request.getCollaborationType(),
@@ -130,14 +130,15 @@ public class RevampEvaluationController {
     /** All roles: detailed analytics for a supplier */
     @GetMapping("/{supplierId}/analytics")
     public ResponseEntity<ApiResponse<RevampEvaluationAnalyticsDto>> analyticsBySupplier(
-            @PathVariable UUID supplierId
+            @PathVariable UUID supplierId,
+            @RequestParam(defaultValue = "false") boolean allViewers
     ) {
         revampAccessGuard.requireReadEnabled();
         governanceAuthorizationService.requireAnyRole(
                 getCurrentUserId(),
                 AdminRole.SUPER_ADMIN, AdminRole.RESPONSABILE_ALBO, AdminRole.REVISORE, AdminRole.VIEWER
         );
-        return ResponseEntity.ok(ApiResponse.ok(evaluationService.analyticsBySupplier(supplierId)));
+        return ResponseEntity.ok(ApiResponse.ok(evaluationService.analyticsBySupplier(supplierId, getCurrentUserId(), allViewers)));
     }
 
     private User getCurrentUser() {

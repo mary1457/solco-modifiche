@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,7 +53,7 @@ class RevampEvaluationServiceTest {
     private RevampEvaluationService evaluationService;
 
     @Test
-    void upsertEvaluationCreatesNewEvaluationWithDimensions() {
+    void addEvaluationCreatesNewEvaluationWithDimensions() {
         UUID profileId = UUID.randomUUID();
         UUID viewerId = UUID.randomUUID();
 
@@ -63,8 +64,6 @@ class RevampEvaluationServiceTest {
 
         when(governanceAuthorizationService.requireAnyRole(viewerId, AdminRole.VIEWER))
                 .thenReturn(AdminRole.VIEWER);
-        when(evaluationRepository.findBySupplierRegistryProfileIdAndEvaluatorUserId(profileId, viewerId))
-                .thenReturn(Optional.empty());
         when(supplierRegistryProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
         when(userRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
         when(evaluationRepository.save(any(RevampEvaluation.class))).thenAnswer(invocation -> {
@@ -75,7 +74,7 @@ class RevampEvaluationServiceTest {
         when(evaluationDimensionRepository.save(any(RevampEvaluationDimension.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        RevampEvaluationSummaryDto dto = evaluationService.upsertEvaluation(
+        RevampEvaluationSummaryDto dto = evaluationService.addEvaluation(
                 profileId,
                 viewerId,
                 "CONSULTING",
@@ -95,31 +94,32 @@ class RevampEvaluationServiceTest {
     }
 
     @Test
-    void upsertEvaluationUpdatesExistingEvaluation() {
+    void addEvaluationAlwaysCreatesNewEntry() {
         UUID profileId = UUID.randomUUID();
         UUID viewerId = UUID.randomUUID();
-        UUID existingId = UUID.randomUUID();
 
         RevampSupplierRegistryProfile profile = new RevampSupplierRegistryProfile();
         profile.setId(profileId);
         User viewer = new User();
         viewer.setId(viewerId);
-        RevampEvaluation existing = new RevampEvaluation();
-        existing.setId(existingId);
 
         when(governanceAuthorizationService.requireAnyRole(viewerId, AdminRole.VIEWER))
                 .thenReturn(AdminRole.VIEWER);
-        when(evaluationRepository.findBySupplierRegistryProfileIdAndEvaluatorUserId(profileId, viewerId))
-                .thenReturn(Optional.of(existing));
         when(supplierRegistryProfileRepository.findById(profileId)).thenReturn(Optional.of(profile));
         when(userRepository.findById(viewerId)).thenReturn(Optional.of(viewer));
-        when(evaluationRepository.save(any(RevampEvaluation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(evaluationRepository.save(any(RevampEvaluation.class))).thenAnswer(invocation -> {
+            RevampEvaluation e = invocation.getArgument(0);
+            e.setId(UUID.randomUUID());
+            return e;
+        });
 
-        RevampEvaluationSummaryDto dto = evaluationService.upsertEvaluation(
+        RevampEvaluationSummaryDto dto = evaluationService.addEvaluation(
                 profileId, viewerId, "CONSULTING", "2026-04", null, (short) 3, null, Map.of()
         );
 
-        assertEquals(existingId, dto.id());
+        assertNotNull(dto.id());
         assertEquals(3, dto.overallScore());
+        verify(evaluationRepository, org.mockito.Mockito.never())
+                .findBySupplierRegistryProfileIdAndEvaluatorUserId(any(), any());
     }
 }

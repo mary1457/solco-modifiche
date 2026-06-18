@@ -96,7 +96,7 @@ class RevampEvaluationControllerContractTest {
         request.setComment("Good");
         request.setDimensions(Map.of("quality", (short) 5));
 
-        when(evaluationService.upsertEvaluation(
+        when(evaluationService.addEvaluation(
                 eq(profileId),
                 eq(adminUser.getId()),
                 eq("CONSULTING"),

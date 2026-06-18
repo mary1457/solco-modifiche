@@ -50,7 +50,7 @@ public class RevampEvaluationService {
     private final RevampAuditService auditService;
 
     @Transactional
-    public RevampEvaluationSummaryDto upsertEvaluation(
+    public RevampEvaluationSummaryDto addEvaluation(
             UUID supplierRegistryProfileId,
             UUID viewerUserId,
             String collaborationType,
@@ -68,11 +68,7 @@ public class RevampEvaluationService {
         User evaluator = userRepository.findById(viewerUserId)
                 .orElseThrow(() -> new EntityNotFoundException("User", viewerUserId));
 
-        RevampEvaluation evaluation = evaluationRepository
-                .findBySupplierRegistryProfileIdAndEvaluatorUserId(supplierRegistryProfileId, viewerUserId)
-                .orElseGet(RevampEvaluation::new);
-
-        boolean isNew = evaluation.getId() == null;
+        RevampEvaluation evaluation = new RevampEvaluation();
         evaluation.setSupplierRegistryProfile(profile);
         evaluation.setEvaluatorUser(evaluator);
         evaluation.setCollaborationType(collaborationType);
@@ -83,10 +79,6 @@ public class RevampEvaluationService {
         evaluation.setCreatedAt(LocalDateTime.now());
 
         RevampEvaluation saved = evaluationRepository.save(evaluation);
-
-        if (!isNew) {
-            evaluationDimensionRepository.deleteByEvaluationId(saved.getId());
-        }
 
         if (dimensions != null && !dimensions.isEmpty()) {
             for (Map.Entry<String, Short> entry : dimensions.entrySet()) {
@@ -101,7 +93,7 @@ public class RevampEvaluationService {
             }
         }
 
-        appendEvaluationAudit(isNew ? "revamp.evaluation.created" : "revamp.evaluation.updated", saved, viewerUserId);
+        appendEvaluationAudit("revamp.evaluation.created", saved, viewerUserId);
         return evaluationMapper.toSummary(saved);
     }
 
@@ -243,12 +235,16 @@ public class RevampEvaluationService {
     }
 
     @Transactional(readOnly = true)
-    public RevampEvaluationAnalyticsDto analyticsBySupplier(UUID supplierRegistryProfileId) {
+    public RevampEvaluationAnalyticsDto analyticsBySupplier(UUID supplierRegistryProfileId, UUID callerUserId, boolean allViewers) {
         RevampSupplierRegistryProfile supplier = supplierRegistryProfileRepository.findById(supplierRegistryProfileId)
                 .orElseThrow(() -> new EntityNotFoundException("RevampSupplierRegistryProfile", supplierRegistryProfileId));
 
-        List<RevampEvaluation> evaluations = evaluationRepository
-                .findBySupplierRegistryProfileIdOrderByCreatedAtDesc(supplierRegistryProfileId);
+        boolean scopeToViewer = !allViewers && callerUserId != null &&
+                AdminRole.VIEWER.equals(governanceAuthorizationService.resolveAdminGovernanceRole(callerUserId));
+
+        List<RevampEvaluation> evaluations = scopeToViewer
+                ? evaluationRepository.findAllBySupplierRegistryProfileIdAndEvaluatorUserIdOrderByCreatedAtDesc(supplierRegistryProfileId, callerUserId)
+                : evaluationRepository.findBySupplierRegistryProfileIdOrderByCreatedAtDesc(supplierRegistryProfileId);
 
         Map<UUID, List<RevampEvaluationDimension>> dimensionsByEvaluationId = loadDimensions(evaluations);
         List<RevampEvaluationHistoryItemDto> history = new ArrayList<>();
@@ -460,7 +456,8 @@ public class RevampEvaluationService {
             return evaluation.getOverallScore() != null ? evaluation.getOverallScore() : 0.0;
         }
         return dimensions.stream()
-                .mapToDouble(d -> d.getScore() != null ? d.getScore() : 0.0)
+                .filter(d -> d.getScore() != null && d.getScore() > 0)
+                .mapToDouble(d -> d.getScore().doubleValue())
                 .average()
                 .orElse(evaluation.getOverallScore() != null ? evaluation.getOverallScore() : 0.0);
     }

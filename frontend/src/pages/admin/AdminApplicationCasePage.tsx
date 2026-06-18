@@ -899,6 +899,20 @@ export function AdminApplicationCasePage() {
       });
     }
 
+    if (summary?.registryType === "ALBO_B") {
+      const lrIdDoc = ((s1Payload?.legalRepresentative as Record<string, unknown> | undefined)?.idDocumentAttachment) as Record<string, unknown> | undefined;
+      const lrIdUrl = findDocumentUrl(lrIdDoc?.storageKey, appId);
+      if (isUploadedAttachment(lrIdDoc)) {
+        rows.push({
+          id: "lr-carta-identita",
+          label: toScalar(lrIdDoc.fileName) || "Carta d'identità legale rappresentante",
+          sectionLabel: "Dati aziendali",
+          url: lrIdUrl,
+          hasLink: Boolean(lrIdUrl)
+        });
+      }
+    }
+
     const s4Attachments = Array.isArray(s4Payload?.attachments)
       ? (s4Payload.attachments as Array<Record<string, unknown>>)
       : [];
@@ -920,7 +934,7 @@ export function AdminApplicationCasePage() {
       });
     });
     return rows;
-  }, [appId, s1Payload, s4Payload]);
+  }, [appId, s1Payload, s4Payload, summary?.registryType]);
 
   const checklistRows = useMemo(
     () => [

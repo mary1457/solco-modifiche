@@ -15,4 +15,8 @@ public interface RevampEvaluationRepository extends JpaRepository<RevampEvaluati
             UUID supplierRegistryProfileId,
             UUID evaluatorUserId
     );
+    List<RevampEvaluation> findAllBySupplierRegistryProfileIdAndEvaluatorUserIdOrderByCreatedAtDesc(
+            UUID supplierRegistryProfileId,
+            UUID evaluatorUserId
+    );
 }

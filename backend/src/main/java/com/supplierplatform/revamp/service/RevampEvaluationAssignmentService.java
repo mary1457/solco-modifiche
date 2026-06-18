@@ -78,11 +78,11 @@ public class RevampEvaluationAssignmentService {
                         Optional<RevampSupplierEvaluatorAssignment> assignment =
                                 assignmentRepository.findBySupplierRegistryProfileIdAndAssignedEvaluatorUserId(
                                         profile.getId(), actorUserId);
-                        Optional<RevampEvaluation> evaluation = assignment.isPresent()
-                                ? evaluationRepository.findBySupplierRegistryProfileIdAndEvaluatorUserId(
+                        Optional<RevampEvaluation> latestEval = evaluationRepository
+                                .findAllBySupplierRegistryProfileIdAndEvaluatorUserIdOrderByCreatedAtDesc(
                                         profile.getId(), actorUserId)
-                                : Optional.empty();
-                        return toRow(profile, assignment.orElse(null), evaluation.orElse(null));
+                                .stream().findFirst();
+                        return toRow(profile, assignment.orElse(null), latestEval.orElse(null));
                     })
                     .sorted(Comparator.comparing(RevampEvaluationAssignmentRowDto::supplierName,
                             Comparator.nullsLast(String::compareToIgnoreCase)))
@@ -94,9 +94,10 @@ public class RevampEvaluationAssignmentService {
                 .filter(a -> a.getSupplierRegistryProfile() != null && a.getAssignedEvaluatorUser() != null)
                 .map(a -> {
                     RevampSupplierRegistryProfile profile = a.getSupplierRegistryProfile();
-                    Optional<RevampEvaluation> evaluation =
-                            evaluationRepository.findBySupplierRegistryProfileIdAndEvaluatorUserId(
-                                    profile.getId(), a.getAssignedEvaluatorUser().getId());
+                    Optional<RevampEvaluation> evaluation = evaluationRepository
+                            .findAllBySupplierRegistryProfileIdAndEvaluatorUserIdOrderByCreatedAtDesc(
+                                    profile.getId(), a.getAssignedEvaluatorUser().getId())
+                            .stream().findFirst();
                     return toRow(profile, a, evaluation.orElse(null));
                 })
                 .sorted(Comparator.comparing(RevampEvaluationAssignmentRowDto::supplierName,

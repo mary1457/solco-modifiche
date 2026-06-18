@@ -13,13 +13,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Entity
-@Table(
-        name = RevampTableNames.EVALUATIONS,
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_evaluation_supplier_evaluator",
-                columnNames = {"supplier_registry_profile_id", "evaluator_user_id"}
-        )
-)
+@Table(name = RevampTableNames.EVALUATIONS)
 @EntityListeners(AuditingEntityListener.class)
 public class RevampEvaluation {
 

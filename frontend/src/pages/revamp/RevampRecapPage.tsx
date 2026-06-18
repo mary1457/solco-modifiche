@@ -446,8 +446,8 @@ export function RevampRecapPage() {
             <Card title="Istruzione e CV" editPath={`/apply/${registryParam}/step/2`} accent={accent}>
               <FieldRow label="Titolo di studio" value={TITOLO_LABELS[s2Data.titoloStudio as string] ?? (s2Data.titoloStudio as string | undefined)} />
               <FieldRow label="Anno conseguimento" value={s2Data.annoConseg as string | undefined} />
-              {s2Data.ambitoDropdown && <FieldRow label="Ambito" value={s2Data.ambitoDropdown as string} />}
-              {s2Data.ambitoStudio && <FieldRow label="Indirizzo di studio" value={s2Data.ambitoStudio as string} />}
+              {s2Data.ambitoDropdown ? <FieldRow label="Ambito" value={s2Data.ambitoDropdown as string} /> : null}
+              {s2Data.ambitoStudio ? <FieldRow label="Indirizzo di studio" value={s2Data.ambitoStudio as string} /> : null}
               {cvAttachment && <><Divider /><FieldRow label="CV allegato" value={cvAttachment.fileName as string} /></>}
             </Card>
           )}
@@ -459,7 +459,7 @@ export function RevampRecapPage() {
               <Divider />
               <FieldRow label="Titolo di studio" value={TITOLO_LABELS[s3.titoloB as string] ?? (s3.titoloB as string | undefined)} />
               <FieldRow label="Anni di esperienza" value={ANNI_PROF_LABELS[s3.anniEsp as string] ?? (s3.anniEsp as string | undefined)} />
-              {s3.ordine && <FieldRow label="Ordine professionale" value={s3.ordine as string} />}
+              {s3.ordine ? <FieldRow label="Ordine professionale" value={s3.ordine as string} /> : null}
               <FieldRow label="Ambito di studio" value={s3.ambitoB as string | undefined} />
             </Card>
           )}
@@ -556,7 +556,7 @@ export function RevampRecapPage() {
             /* Albo B — disponibilità */
             <Card title="Disponibilità e Allegati" editPath={`/apply/${registryParam}/step/4`} accent={accent}>
               <FieldRow label="Area territoriale" value={s4.areaTerrB as string | undefined} />
-              {s4.tariffaOraB && <FieldRow label="Tariffa oraria" value={s4.tariffaOraB as string} />}
+              {s4.tariffaOraB ? <FieldRow label="Tariffa oraria" value={s4.tariffaOraB as string} /> : null}
               {espCount > 0 && (
                 <>
                   <Divider />

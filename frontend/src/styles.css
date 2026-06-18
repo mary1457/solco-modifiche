@@ -26743,6 +26743,16 @@ body {
   transition: background 0.13s ease;
 }
 
+.eval-table-wrap--compact .eval-table-head,
+.eval-table-wrap--compact .eval-table-row {
+  grid-template-columns: 0.95fr 1.65fr 0.55fr 1.3fr 0.65fr;
+}
+
+.eval-table-wrap--compact .eval-table-head > div:nth-child(5),
+.eval-table-wrap--compact .eval-col-actions {
+  justify-self: end;
+}
+
 .eval-table-row:last-child {
   border-bottom: none;
 }

@@ -145,8 +145,9 @@ export function getAdminEvaluationOverview(
   return apiRequest<AdminEvaluationOverview>(`${BASE}/overview?${query.toString()}`, {}, token);
 }
 
-export function getAdminEvaluationAnalytics(supplierId: string, token: string): Promise<AdminEvaluationAnalytics> {
-  return apiRequest<AdminEvaluationAnalytics>(`${BASE}/${encodeURIComponent(supplierId)}/analytics`, {}, token);
+export function getAdminEvaluationAnalytics(supplierId: string, token: string, allViewers = false): Promise<AdminEvaluationAnalytics> {
+  const qs = allViewers ? "?allViewers=true" : "";
+  return apiRequest<AdminEvaluationAnalytics>(`${BASE}/${encodeURIComponent(supplierId)}/analytics${qs}`, {}, token);
 }
 
 export function getAdminEvaluationList(supplierId: string, token: string): Promise<AdminEvaluationSummary[]> {

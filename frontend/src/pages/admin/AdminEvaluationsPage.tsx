@@ -70,7 +70,8 @@ const DIMENSIONS = [
   { key: "timeliness", label: "Rispetto tempi" },
   { key: "communication", label: "Comunicazione" },
   { key: "flexibility", label: "Flessibilità" },
-  { key: "value", label: "Qualità/Prezzo" }
+  { key: "value", label: "Qualità/Prezzo" },
+  { key: "classroom", label: "Valutazione aula" }
 ];
 
 function shouldRefreshEvaluations(event: DashboardActivityEvent): boolean {
@@ -133,7 +134,7 @@ function StarInput({ value, onChange, disabled = false }: { value: number; onCha
           {star <= value ? "★" : "☆"}
         </button>
       ))}
-      <strong>{value > 0 ? `${value}/5` : "Da compilare"}</strong>
+      {value > 0 && <strong>{value}/5</strong>}
     </div>
   );
 }
@@ -173,6 +174,7 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [detailContext, setDetailContext] = useState<"VALUTATI" | "DA_VALUTARE">("VALUTATI");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "ALBO_A" | "ALBO_B">("ALL");
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>("ALL");
 
@@ -260,11 +262,11 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
 
   useAdminRealtimeRefresh({ token, shouldRefresh: shouldRefreshEvaluations, onRefresh: () => loadPage(false) });
 
-  const loadSupplierDetail = useCallback(async (supplierId: string) => {
+  const loadSupplierDetail = useCallback(async (supplierId: string, allViewers = false) => {
     if (!token) return;
     try {
       const [analyticsData, evals] = await Promise.all([
-        getAdminEvaluationAnalytics(supplierId, token),
+        getAdminEvaluationAnalytics(supplierId, token, allViewers),
         getAdminEvaluationList(supplierId, token)
       ]);
       setAnalytics(analyticsData);
@@ -276,13 +278,13 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
 
   useEffect(() => {
     if (selectedSupplierId) {
-      void loadSupplierDetail(selectedSupplierId);
+      void loadSupplierDetail(selectedSupplierId, detailContext === "VALUTATI");
     } else {
       setAnalytics(EMPTY_ANALYTICS);
       setSupplierEvaluations([]);
       setShowEvalForm(false);
     }
-  }, [loadSupplierDetail, selectedSupplierId]);
+  }, [loadSupplierDetail, selectedSupplierId, detailContext]);
 
   function openEvalForm() {
     setEvalForm(EMPTY_FORM);
@@ -314,8 +316,9 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
       setToast({ message: "Inserisci il tipo di collaborazione.", type: "error" });
       return;
     }
-    if (!evalForm.collaborationPeriod.trim()) {
-      setToast({ message: "Inserisci il periodo di collaborazione.", type: "error" });
+    const periodYear = parseInt(evalForm.collaborationPeriod, 10);
+    if (!evalForm.collaborationPeriod.trim() || isNaN(periodYear) || periodYear < 1900 || periodYear > new Date().getFullYear()) {
+      setToast({ message: `Inserisci un anno valido (1900 – ${new Date().getFullYear()}).`, type: "error" });
       return;
     }
     setBusy("submit");
@@ -326,12 +329,15 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
         referenceCode: evalForm.referenceCode || undefined,
         overallScore: computedOverallScore,
         comment: evalForm.comment || undefined,
-        dimensions: Object.keys(evalForm.dimensions).length > 0 ? evalForm.dimensions : undefined
+        dimensions: (() => {
+          const rated = Object.fromEntries(Object.entries(evalForm.dimensions).filter(([, v]) => (v as number) > 0));
+          return Object.keys(rated).length > 0 ? rated : undefined;
+        })()
       };
       await submitEvaluation(selectedSupplierId, payload, token);
       setToast({ message: "Valutazione salvata.", type: "success" });
       setShowEvalForm(false);
-      await Promise.all([loadPage(false), loadSupplierDetail(selectedSupplierId)]);
+      await Promise.all([loadPage(false), loadSupplierDetail(selectedSupplierId, detailContext === "VALUTATI")]);
     } catch (error) {
       setToast({ message: error instanceof HttpError ? error.message : "Errore nell'invio.", type: "error" });
     } finally {
@@ -352,7 +358,7 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
     try {
       await deleteAdminEvaluation(evaluationId, token);
       setToast({ message: "Valutazione eliminata.", type: "success" });
-      if (selectedSupplierId) await loadSupplierDetail(selectedSupplierId);
+      if (selectedSupplierId) await loadSupplierDetail(selectedSupplierId, detailContext === "VALUTATI");
       await loadPage(false);
     } catch (error) {
       setToast({ message: error instanceof HttpError ? error.message : "Errore nell'eliminazione.", type: "error" });
@@ -361,7 +367,8 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
     }
   }
 
-  function selectSupplier(supplierId: string, overviewRow?: AdminEvaluationOverviewRow) {
+  function selectSupplier(supplierId: string, overviewRow?: AdminEvaluationOverviewRow, context: "VALUTATI" | "DA_VALUTARE" = "VALUTATI") {
+    setDetailContext(context);
     setSelectedSupplierId(supplierId);
     setSelectedOverviewRow(overviewRow ?? null);
     setShowEvalForm(false);
@@ -522,7 +529,8 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
         ) : (
           <EvalTable
             rows={visibleEvaluatedRows}
-            onSelect={(row) => selectSupplier(row.supplierRegistryProfileId, row)}
+            onSelect={(row) => selectSupplier(row.supplierRegistryProfileId, row, "VALUTATI")}
+            hideEvaluatorDate
           />
         )
       ) : isViewer ? (
@@ -534,7 +542,7 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
               <button
                 key={row.supplierRegistryProfileId}
                 className={`eval-row ${row.evaluationId ? "evaluated" : row.assignmentId ? "assigned" : "unassigned"}`}
-                onClick={() => selectSupplier(row.supplierRegistryProfileId)}
+                onClick={() => selectSupplier(row.supplierRegistryProfileId, undefined, "DA_VALUTARE")}
               >
                 <span className="eval-row-avatar">{initials(row.supplierName)}</span>
                 <span className="eval-row-info">
@@ -561,7 +569,7 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
         ) : (
           <EvalTable
             rows={visibleUnevaluatedRows}
-            onSelect={(row) => selectSupplier(row.supplierRegistryProfileId, row)}
+            onSelect={(row) => selectSupplier(row.supplierRegistryProfileId, row, "DA_VALUTARE")}
             unevaluated
           />
         )
@@ -594,11 +602,11 @@ export function AdminEvaluationsPage(_props: { mode?: string }) {
                 isSuperAdmin={isSuperAdmin}
                 isAssignedToMe={isAssignedToMe}
                 hasMyEvaluation={hasMyEvaluation}
-                myAssignmentRow={myAssignment}
                 showEvalForm={showEvalForm}
                 evalForm={evalForm}
                 computedOverallScore={computedOverallScore}
                 busy={busy}
+                detailContext={detailContext}
                 onSelfAssign={handleSelfAssign}
                 onOpenForm={openEvalForm}
                 onCloseForm={() => setShowEvalForm(false)}
@@ -624,21 +632,23 @@ function EvalTable({
   onSelect,
   canEvaluate = false,
   unevaluated = false,
+  hideEvaluatorDate = false,
 }: {
   rows: AdminEvaluationOverviewRow[];
   onSelect: (row: AdminEvaluationOverviewRow) => void;
   canEvaluate?: boolean;
   unevaluated?: boolean;
+  hideEvaluatorDate?: boolean;
 }) {
   return (
-    <div className="eval-table-wrap">
+    <div className={`eval-table-wrap${hideEvaluatorDate ? " eval-table-wrap--compact" : ""}`}>
       <div className="eval-table-head">
         <div>CANDIDATURA</div>
         <div>FORNITORE</div>
         <div>ALBO</div>
         <div>ESITO</div>
-        <div>VALUTATORE</div>
-        <div>DATA</div>
+        {!hideEvaluatorDate && <div>VALUTATORE</div>}
+        {!hideEvaluatorDate && <div>DATA</div>}
         <div>AZIONI</div>
       </div>
       {rows.map((row, index) => {
@@ -682,14 +692,18 @@ function EvalTable({
               </>
             )}
           </div>
-          <div className="eval-col-evaluator">
-            <span>{row.evaluatorDisplay ?? "—"}</span>
-            <small>{unevaluated ? "Non assegnato" : row.evaluationCount && row.evaluationCount > 1 ? "Aggregato" : "Valutatore"}</small>
-          </div>
-          <div className="eval-col-date">
-            <span>{unevaluated ? "—" : formatDate(row.createdAt)}</span>
-            <small>{unevaluated ? "Nessuna valutazione" : "Ultima valutazione"}</small>
-          </div>
+          {!hideEvaluatorDate && (
+            <div className="eval-col-evaluator">
+              <span>{row.evaluatorDisplay ?? "—"}</span>
+              <small>{unevaluated ? "Non assegnato" : row.evaluationCount && row.evaluationCount > 1 ? "Aggregato" : "Valutatore"}</small>
+            </div>
+          )}
+          {!hideEvaluatorDate && (
+            <div className="eval-col-date">
+              <span>{unevaluated ? "—" : formatDate(row.createdAt)}</span>
+              <small>{unevaluated ? "Nessuna valutazione" : "Ultima valutazione"}</small>
+            </div>
+          )}
           <div className="eval-col-actions">
               <button
                 className={`eval-open-link${canEvaluateRow ? " eval-open-link-evaluate" : ""}`}
@@ -717,11 +731,11 @@ interface SupplierDetailProps {
   isSuperAdmin: boolean;
   isAssignedToMe: boolean;
   hasMyEvaluation: boolean;
-  myAssignmentRow: AdminEvaluationAssignmentRow | null;
   showEvalForm: boolean;
   evalForm: EvalForm;
   computedOverallScore: number;
   busy: string | null;
+  detailContext?: "VALUTATI" | "DA_VALUTARE";
   onSelfAssign: () => void;
   onOpenForm: () => void;
   onCloseForm: () => void;
@@ -740,11 +754,11 @@ function SupplierDetail({
   isSuperAdmin,
   isAssignedToMe,
   hasMyEvaluation,
-  myAssignmentRow,
   showEvalForm,
   evalForm,
   computedOverallScore,
   busy,
+  detailContext = "DA_VALUTARE",
   onSelfAssign,
   onOpenForm,
   onCloseForm,
@@ -753,6 +767,7 @@ function SupplierDetail({
   onSubmitEval,
   onDeleteEval
 }: SupplierDetailProps) {
+  const isValutatiView = detailContext === "VALUTATI";
   return (
     <div className="eval-detail">
       {/* Hero banner: avatar + name + score ring + action button */}
@@ -773,7 +788,7 @@ function SupplierDetail({
               </span>
             </>
           )}
-          {isViewer && !showEvalForm && (
+          {isViewer && !isValutatiView && !showEvalForm && (
             !isAssignedToMe ? (
               <button className="eval-btn-hero" onClick={onSelfAssign} disabled={busy === "assign"}>
                 <UserCheck size={15} />
@@ -782,32 +797,32 @@ function SupplierDetail({
             ) : (
               <button className="eval-btn-hero" onClick={onOpenForm}>
                 <Star size={15} />
-                {hasMyEvaluation ? "Ri-valuta" : "Valuta fornitore"}
+                {hasMyEvaluation ? "Aggiungi valutazione" : "Valuta fornitore"}
               </button>
             )
           )}
         </div>
       </div>
 
-      {isViewer && myAssignmentRow?.evaluationId && !showEvalForm && (
+      {isViewer && !isValutatiView && analytics.totalEvaluations > 0 && !showEvalForm && (
         <div className="eval-my-evaluation">
           <div className="eval-my-eval-left">
             <h3>La mia valutazione</h3>
-            <ReadOnlyStars value={myAssignmentRow.evaluationScore ?? 0} />
+            <ReadOnlyStars value={analytics.averageOverallScore} />
           </div>
           <div className="eval-my-eval-right">
-            <span className="eval-date">Aggiornato il {formatDate(myAssignmentRow.evaluatedAt)}</span>
+            <span className="eval-date">{analytics.totalEvaluations} valutazion{analytics.totalEvaluations === 1 ? "e" : "i"} date</span>
           </div>
         </div>
       )}
 
-      {isViewer && showEvalForm && (
+      {isViewer && !isValutatiView && showEvalForm && (
         <form className="eval-form" onSubmit={onSubmitEval}>
           {/* Header with icon */}
           <div className="eval-form-head">
             <div className="eval-form-head-icon"><Star size={16} /></div>
             <div>
-              <h3>{hasMyEvaluation ? "Aggiorna valutazione" : "Nuova valutazione"}</h3>
+              <h3>Nuova valutazione</h3>
               <span className="eval-form-head-sub">I campi con * sono obbligatori</span>
             </div>
           </div>
@@ -852,8 +867,17 @@ function SupplierDetail({
               <input type="text" className="eval-input" placeholder="es. Fornitura materiali, Consulenza..." value={evalForm.collaborationType} onChange={(e) => onFormChange("collaborationType", e.target.value)} required />
             </div>
             <div className="eval-form-section">
-              <label className="eval-label">Periodo collaborazione *</label>
-              <input type="text" className="eval-input" placeholder="es. 2024-Q3, Gen-Mar 2025..." value={evalForm.collaborationPeriod} onChange={(e) => onFormChange("collaborationPeriod", e.target.value)} required />
+              <label className="eval-label">Anno collaborazione *</label>
+              <input
+                type="number"
+                className="eval-input"
+                placeholder={String(new Date().getFullYear())}
+                min={1900}
+                max={new Date().getFullYear()}
+                value={evalForm.collaborationPeriod}
+                onChange={(e) => onFormChange("collaborationPeriod", e.target.value)}
+                required
+              />
             </div>
             <div className="eval-form-section">
               <label className="eval-label">Codice riferimento</label>
@@ -868,7 +892,7 @@ function SupplierDetail({
           <div className="eval-form-actions">
             <button type="button" className="eval-btn-secondary" onClick={onCloseForm} disabled={Boolean(busy)}>Annulla</button>
             <button type="submit" className="eval-btn-primary" disabled={Boolean(busy)}>
-              {busy === "submit" ? "Invio..." : hasMyEvaluation ? "Aggiorna" : "Invia valutazione"}
+              {busy === "submit" ? "Invio..." : "Aggiungi"}
             </button>
           </div>
         </form>
@@ -908,7 +932,7 @@ function SupplierDetail({
         </div>
       )}
 
-      {analytics.history.length > 0 && !showEvalForm && (() => {
+      {!isValutatiView && analytics.history.length > 0 && !showEvalForm && (() => {
         const emailByEvalId = new Map(evaluations.map((e) => [e.id, e.evaluatorEmail]));
         return (
           <div className="eval-evaluations-list">
@@ -952,7 +976,7 @@ function SupplierDetail({
         );
       })()}
 
-      {evaluations.length === 0 && !showEvalForm && (
+      {!isValutatiView && evaluations.length === 0 && !showEvalForm && (
         <div className="eval-empty-detail">
           <Star size={32} className="eval-empty-icon" />
           <p>Nessuna valutazione ancora per questo fornitore.</p>
